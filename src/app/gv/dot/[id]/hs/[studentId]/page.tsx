@@ -6,6 +6,8 @@ import { fmtDateTime } from "@/lib/format";
 import { buildFeedbackDraft, findOption, findUrgentKeywords, parseAnswers, parseQuestions } from "@/lib/questions";
 import { studentFlags } from "@/lib/insights";
 import { FlagList, PageHeader } from "@/components/ui";
+import { ParentNotifyButtons } from "@/components/ParentNotify";
+import { buildParentMessage, ensureParentTokens, parentLink, siteUrl, smsPhone } from "@/lib/parent";
 import { FeedbackEditor } from "./FeedbackEditor";
 
 export default async function ResponseReviewPage({ params }: { params: Promise<{ id: string; studentId: string }> }) {
@@ -16,7 +18,10 @@ export default async function ResponseReviewPage({ params }: { params: Promise<{
 
   const [student, response, prev, siblings] = await Promise.all([
     prisma.student.findFirst({ where: { id: studentId, classId: survey.classId }, include: { user: true } }),
-    prisma.response.findUnique({ where: { surveyId_studentId: { surveyId: id, studentId } }, include: { feedback: true } }),
+    prisma.response.findUnique({
+      where: { surveyId_studentId: { surveyId: id, studentId } },
+      include: { feedback: { include: { teacher: { select: { fullName: true } } } } },
+    }),
     prisma.response.findFirst({
       where: { studentId, survey: { classId: survey.classId, openAt: { lt: survey.openAt } } },
       orderBy: { survey: { openAt: "desc" } },
@@ -40,6 +45,22 @@ export default async function ResponseReviewPage({ params }: { params: Promise<{
   const urgentWords = response ? findUrgentKeywords(questions, answers) : [];
   const flags = studentFlags({ questions: survey.questions, current: response, previous: prev });
   const goals = Array.isArray(response?.feedback?.goals) ? (response.feedback.goals as unknown[]).map(String) : [];
+
+  // Tin báo phụ huynh, chỉ có sau khi giáo viên đã gửi nhận xét
+  const published = response?.feedback?.published ? response.feedback : null;
+  let parentMessage = "";
+  if (published) {
+    const tokens = await ensureParentTokens([student]);
+    parentMessage = buildParentMessage({
+      className: survey.classroom.name,
+      studentName: student.user.fullName,
+      surveyTitle: survey.title,
+      score: response!.score,
+      feedback: published.content,
+      teacherName: published.teacher?.fullName,
+      link: parentLink(await siteUrl(), tokens.get(student.id)!),
+    });
+  }
 
   return (
     <>
@@ -112,14 +133,37 @@ export default async function ResponseReviewPage({ params }: { params: Promise<{
             </div>
           </div>
 
-          <div className="card h-fit lg:sticky lg:top-20">
-            <FeedbackEditor
-              key={response.id}
-              responseId={response.id}
-              published={!!response.feedback?.published}
-              initial={response.feedback ? { content: response.feedback.content, goals } : null}
-              draft={buildFeedbackDraft(questions, answers, { score: response.score, previousScore: prev?.score })}
-            />
+          <div className="h-fit space-y-4 lg:sticky lg:top-20">
+            <div className="card">
+              <FeedbackEditor
+                key={response.id}
+                responseId={response.id}
+                published={!!response.feedback?.published}
+                initial={response.feedback ? { content: response.feedback.content, goals } : null}
+                draft={buildFeedbackDraft(questions, answers, { score: response.score, previousScore: prev?.score })}
+              />
+            </div>
+            <div className="card">
+              <h2 className="mb-2 font-semibold">Báo cho phụ huynh</h2>
+              {published ? (
+                <>
+                  <p className="mb-2 text-xs text-slate-500">
+                    Bấm nút dưới đây trên điện thoại để mở tin nhắn đã soạn sẵn
+                    {student.parentName ? ` gửi ${student.parentName}` : ""}. Tin nhắn gửi từ số của thầy/cô, phần mềm không tốn phí.
+                  </p>
+                  <pre className="mb-3 whitespace-pre-wrap rounded-lg bg-slate-50 p-3 font-sans text-sm text-slate-700">{parentMessage}</pre>
+                  <ParentNotifyButtons
+                    feedbackId={published.id}
+                    studentId={student.id}
+                    phone={smsPhone(student.parentPhone)}
+                    message={parentMessage}
+                    notifiedAt={published.parentNotifiedAt ? fmtDateTime(published.parentNotifiedAt) : null}
+                  />
+                </>
+              ) : (
+                <p className="text-sm text-slate-500">Sau khi bấm Gửi nhận xét, nút nhắn tin cho phụ huynh sẽ hiện ở đây.</p>
+              )}
+            </div>
           </div>
         </div>
       )}

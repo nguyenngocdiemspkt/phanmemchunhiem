@@ -9,6 +9,8 @@ import { Badge, FlagList, PageHeader, ProgressBar, StatusBadge } from "@/compone
 import { SubmitButton } from "@/components/SubmitButton";
 import { EditSurveyForm } from "../SurveyForms";
 import { closeSurveyNowAction, deleteSurveyAction } from "../actions";
+import { ParentNotifyButtons } from "@/components/ParentNotify";
+import { buildParentMessage, ensureParentTokens, parentLink, siteUrl, smsPhone } from "@/lib/parent";
 
 export default async function SurveyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -21,7 +23,10 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
       where: { classId: survey.classId, OR: [{ user: { active: true } }, { responses: { some: { surveyId: id } } }] },
       include: { user: { select: { fullName: true } } },
     }),
-    prisma.response.findMany({ where: { surveyId: id }, include: { feedback: true } }),
+    prisma.response.findMany({
+      where: { surveyId: id },
+      include: { feedback: { include: { teacher: { select: { fullName: true } } } } },
+    }),
     prisma.survey.findFirst({
       where: { classId: survey.classId, openAt: { lt: survey.openAt } },
       orderBy: { openAt: "desc" },
@@ -49,6 +54,26 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
     );
   const nameOf = new Map(students.map((s) => [s.id, s.user.fullName]));
 
+  // Tin báo phụ huynh cho các em đã được gửi nhận xét
+  const notifiable = rows.filter((x) => x.r?.feedback?.published);
+  const tokens = await ensureParentTokens(notifiable.map((x) => x.st));
+  const base = await siteUrl();
+  const parentMessages = new Map(
+    notifiable.map(({ st, r }) => [
+      st.id,
+      buildParentMessage({
+        className: survey.classroom.name,
+        studentName: st.user.fullName,
+        surveyTitle: survey.title,
+        score: r!.score,
+        feedback: r!.feedback!.content,
+        teacherName: r!.feedback!.teacher?.fullName,
+        link: parentLink(base, tokens.get(st.id)!),
+      }),
+    ]),
+  );
+  const notifiedCount = notifiable.filter((x) => x.r!.feedback!.parentNotifiedAt).length;
+
   return (
     <>
       <PageHeader
@@ -67,7 +92,7 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
           <ProgressBar value={rate} />
           <div className="mt-1 text-sm text-slate-600">
             Đã nộp <b>{responses.length}</b>/{students.length} ({rate}%) · Đã gửi nhận xét{" "}
-            <b>{responses.filter((r) => r.feedback?.published).length}</b>
+            <b>{notifiable.length}</b> · Đã báo phụ huynh <b>{notifiedCount}</b>
           </div>
         </div>
 
@@ -80,6 +105,7 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
                 <th>Mức tự đánh giá</th>
                 <th>Dấu hiệu</th>
                 <th>Nhận xét</th>
+                <th>Báo phụ huynh</th>
               </tr>
             </thead>
             <tbody>
@@ -107,6 +133,18 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
                         )}
                         <span className="link text-xs">Xem →</span>
                       </Link>
+                    )}
+                  </td>
+                  <td className="min-w-40">
+                    {r?.feedback?.published && (
+                      <ParentNotifyButtons
+                        compact
+                        feedbackId={r.feedback.id}
+                        studentId={st.id}
+                        phone={smsPhone(st.parentPhone)}
+                        message={parentMessages.get(st.id)!}
+                        notifiedAt={r.feedback.parentNotifiedAt ? fmtDateTime(r.feedback.parentNotifiedAt) : null}
+                      />
                     )}
                   </td>
                 </tr>

@@ -32,5 +32,5 @@ export async function saveFeedbackAction(responseId: string, _prev: FeedbackStat
   await prisma.feedback.upsert({ where: { responseId }, create: { responseId, ...data }, update: data });
   revalidatePath(`/gv/dot/${response.surveyId}`, "layout");
   revalidatePath("/hs", "layout");
-  return { ok: published ? "Đã gửi nhận xét cho học sinh." : intent === "unpublish" ? "Đã thu hồi, học sinh không còn thấy nhận xét." : "Đã lưu bản nháp." };
+  return { ok: published ? "Đã gửi nhận xét cho học sinh. Có thể báo phụ huynh ở khung bên dưới." : intent === "unpublish" ? "Đã thu hồi, học sinh không còn thấy nhận xét." : "Đã lưu bản nháp." };
 }

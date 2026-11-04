@@ -74,6 +74,8 @@ model Student {
   groupNo     Int?
   /// Cán sự lớp: được ghi điểm thi đua
   isMonitor   Boolean   @default(false)
+  /// Mã bí mật trong đường link phụ huynh xem kết quả (/ph/<mã>), không cần đăng nhập
+  parentToken String?   @unique
 
   responses        Response[]
   notes            Note[]
@@ -143,6 +145,8 @@ model Feedback {
   goals       Json
   published   Boolean   @default(false)
   publishedAt DateTime?
+  /// Lần cuối giáo viên bấm nhắn/sao chép tin gửi phụ huynh
+  parentNotifiedAt DateTime?
   updatedAt   DateTime  @updatedAt
 }
 

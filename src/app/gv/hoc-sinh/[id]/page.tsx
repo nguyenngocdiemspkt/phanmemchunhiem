@@ -9,6 +9,8 @@ import { LineChartCard } from "@/components/LineChartCard";
 import { SubmitButton } from "@/components/SubmitButton";
 import { AddNoteForm, ProfileForm } from "./StudentForms";
 import { deleteNoteAction } from "./actions";
+import { ensureParentTokens, parentLink, siteUrl } from "@/lib/parent";
+import { regenerateParentLinkAction } from "@/lib/parentActions";
 
 export default async function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -42,6 +44,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
   const scores = submitted.map((h) => h.response!.score).filter((x): x is number => x != null);
   const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
   const trend = scores.length >= 2 ? scores.at(-1)! - scores.at(-2)! : null;
+  const parentUrl = parentLink(await siteUrl(), (await ensureParentTokens([student])).get(student.id)!);
 
   return (
     <>
@@ -151,6 +154,29 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
             />
           </div>
         </details>
+
+        <div className="card">
+          <h2 className="mb-1 font-semibold">Link cho phụ huynh</h2>
+          <p className="mb-3 text-sm text-slate-500">
+            Phụ huynh mở link này để xem các phiếu tự đánh giá đã được thầy/cô nhận xét, không cần tài khoản. Link được gửi kèm khi bấm
+            &quot;Nhắn SMS&quot; ở trang nhận xét.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <input readOnly value={parentUrl} className="input max-w-xl flex-1 font-mono text-xs" />
+            <a href={parentUrl} target="_blank" className="btn-secondary btn-sm">
+              Xem thử
+            </a>
+            <form action={regenerateParentLinkAction.bind(null, id)}>
+              <SubmitButton
+                className="btn-danger btn-sm"
+                pendingText="..."
+                confirm="Tạo link mới? Link cũ đã gửi phụ huynh sẽ không mở được nữa (dùng khi lỡ gửi nhầm người)."
+              >
+                Đổi link
+              </SubmitButton>
+            </form>
+          </div>
+        </div>
       </div>
     </>
   );
