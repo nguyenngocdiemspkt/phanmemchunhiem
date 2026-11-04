@@ -29,7 +29,7 @@ export default async function ClassStudentsPage({ params }: { params: Promise<{ 
       <div className="card">
         <h2 className="mb-1 font-semibold">Nhập danh sách từ Excel</h2>
         <p className="mb-3 text-sm text-slate-500">
-          File .xlsx có cột <b>Họ và tên</b> (bắt buộc); các cột tùy chọn: Mã học sinh, Ngày sinh, Giới tính, Họ tên phụ huynh, SĐT
+          File .xlsx có cột <b>Họ và tên</b> (bắt buộc); các cột tùy chọn: Mã học sinh, Ngày sinh, Giới tính, Tổ, Họ tên phụ huynh, SĐT
           phụ huynh, Tên đăng nhập, Mật khẩu.
         </p>
         <ImportStudentsForm classId={id} className={classroom.name} />
@@ -53,6 +53,7 @@ export default async function ClassStudentsPage({ params }: { params: Promise<{ 
                 <th>Họ và tên</th>
                 <th>Mã HS</th>
                 <th>Ngày sinh</th>
+                <th>Tổ</th>
                 <th>Tên đăng nhập</th>
                 <th>Thao tác</th>
               </tr>
@@ -74,6 +75,7 @@ export default async function ClassStudentsPage({ params }: { params: Promise<{ 
                   </td>
                   <td>{s.studentCode ?? ""}</td>
                   <td>{s.dateOfBirth ?? ""}</td>
+                  <td>{s.groupNo ?? ""}</td>
                   <td className="font-mono text-xs">{s.user.username}</td>
                   <td>
                     <div className="flex flex-wrap gap-1">

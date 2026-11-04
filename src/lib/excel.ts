@@ -12,6 +12,7 @@ export type StudentRow = {
   parentName?: string;
   parentPhone?: string;
   address?: string;
+  groupNo?: string;
 };
 
 // Tiêu đề cột (đã bỏ dấu, chữ thường) -> trường dữ liệu
@@ -25,6 +26,7 @@ const HEADER_MAP: [RegExp, keyof Omit<StudentRow, "row">][] = [
   [/^(ho ten phu huynh|phu huynh|ten phu huynh|cha me)$/, "parentName"],
   [/^(sdt phu huynh|so dien thoai phu huynh|dien thoai phu huynh|sdt|so dien thoai)$/, "parentPhone"],
   [/^(dia chi|noi o)$/, "address"],
+  [/^(to|to so|nhom)$/, "groupNo"],
 ];
 
 function cellText(v: ExcelJS.CellValue): string {
@@ -92,6 +94,7 @@ export async function buildStudentTemplate() {
     { header: "Họ và tên", width: 28 },
     { header: "Ngày sinh", width: 14 },
     { header: "Giới tính", width: 10 },
+    { header: "Tổ", width: 6 },
     { header: "Họ tên phụ huynh", width: 26 },
     { header: "SĐT phụ huynh", width: 16 },
     { header: "Tên đăng nhập", width: 18 },
@@ -100,7 +103,7 @@ export async function buildStudentTemplate() {
   ws.getRow(1).font = { bold: true };
   ws.getColumn(2).numFmt = "@";
   ws.getColumn(4).numFmt = "@";
-  ws.getColumn(7).numFmt = "@";
+  ws.getColumn(8).numFmt = "@";
 
   // Ví dụ & hướng dẫn để ở trang riêng, tránh bị nhập nhầm thành học sinh
   const guide = wb.addWorksheet("Hướng dẫn");
@@ -109,9 +112,10 @@ export async function buildStudentTemplate() {
     "Điền danh sách vào trang tính đầu tiên, mỗi học sinh một dòng, bắt đầu từ dòng 2.",
     "Chỉ bắt buộc cột Họ và tên. Các cột khác có thể bỏ trống.",
     "Ngày sinh ghi dạng dd/mm/yyyy, ví dụ 15/03/2010.",
+    "Cột Tổ ghi số tổ (1, 2, 3...) để dùng cho thi đua. Có thể bỏ trống và phân tổ sau trong phần mềm.",
     "Bỏ trống Tên đăng nhập: hệ thống dùng Mã học sinh, hoặc tự tạo theo tên (vd: an.nv.10a1).",
     "Bỏ trống Mật khẩu: hệ thống tạo mật khẩu tạm 6 chữ số. Học sinh phải đổi mật khẩu khi đăng nhập lần đầu.",
-    "Ví dụ: 1 | HS001 | Nguyễn Văn An | 15/03/2010 | Nam | Nguyễn Văn Bình | 0901234567 | (trống) | (trống)",
+    "Ví dụ: 1 | HS001 | Nguyễn Văn An | 15/03/2010 | Nam | 1 | Nguyễn Văn Bình | 0901234567 | (trống) | (trống)",
   ].forEach((line) => guide.addRow([line]));
   return wb.xlsx.writeBuffer();
 }

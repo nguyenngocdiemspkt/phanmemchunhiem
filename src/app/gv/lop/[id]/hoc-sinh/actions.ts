@@ -24,8 +24,13 @@ function suggestUsername(fullName: string, className: string) {
   return [given, initials, slug(className)].filter(Boolean).join(".");
 }
 
-async function createStudents(classId: string, className: string, rows: StudentRow[]) {
+async function createStudents(classId: string, className: string, groupCount: number, rows: StudentRow[]) {
   const errors: string[] = [];
+  // "Tổ 2", "2" -> 2; ngoài khoảng số tổ của lớp thì để trống
+  const toGroup = (v?: string) => {
+    const n = Number(v?.match(/\d+/)?.[0]);
+    return Number.isInteger(n) && n >= 1 && n <= groupCount ? n : null;
+  };
   const taken = new Set(
     (
       await prisma.user.findMany({
@@ -106,6 +111,7 @@ async function createStudents(classId: string, className: string, rows: StudentR
               parentName: p.row.parentName,
               parentPhone: p.row.parentPhone,
               address: p.row.address,
+              groupNo: toGroup(p.row.groupNo),
             },
           },
         },
@@ -129,7 +135,7 @@ export async function importStudentsAction(classId: string, _prev: ImportState, 
   if (rows.length === 0) return { error: "Không có dòng học sinh nào trong file." };
   if (rows.length > MAX_ROWS) return { error: `Mỗi lần nhập tối đa ${MAX_ROWS} học sinh.` };
 
-  const result = await createStudents(classId, classroom.name, rows);
+  const result = await createStudents(classId, classroom.name, classroom.groupCount, rows);
   revalidatePath(`/gv/lop/${classId}`, "layout");
   return result;
 }
@@ -139,7 +145,7 @@ export async function addStudentAction(classId: string, _prev: ImportState, form
   const get = (k: string) => String(formData.get(k) ?? "").trim() || undefined;
   const fullName = get("fullName");
   if (!fullName) return { error: "Vui lòng nhập họ tên." };
-  const result = await createStudents(classId, classroom.name, [
+  const result = await createStudents(classId, classroom.name, classroom.groupCount, [
     {
       row: 1,
       fullName,

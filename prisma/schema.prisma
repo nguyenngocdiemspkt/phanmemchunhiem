@@ -37,6 +37,7 @@ model User {
   templates       FormTemplate[]
   feedbacks       Feedback[]
   notes           Note[]
+  emulationRecords EmulationRecord[]
 }
 
 model Classroom {
@@ -45,10 +46,14 @@ model Classroom {
   schoolYear        String
   homeroomTeacherId String?
   homeroomTeacher   User?    @relation("Homeroom", fields: [homeroomTeacherId], references: [id], onDelete: SetNull)
+  /// Số tổ của lớp, dùng cho thi đua
+  groupCount        Int      @default(4)
   createdAt         DateTime @default(now())
 
-  students Student[]
-  surveys  Survey[]
+  students            Student[]
+  surveys             Survey[]
+  emulationCategories EmulationCategory[]
+  emulationRecords    EmulationRecord[]
 
   @@unique([name, schoolYear])
 }
@@ -65,9 +70,14 @@ model Student {
   address     String?
   parentName  String?
   parentPhone String?
+  /// Tổ (1..groupCount), null = chưa phân tổ
+  groupNo     Int?
+  /// Cán sự lớp: được ghi điểm thi đua
+  isMonitor   Boolean   @default(false)
 
-  responses Response[]
-  notes     Note[]
+  responses        Response[]
+  notes            Note[]
+  emulationRecords EmulationRecord[]
 
   @@index([classId])
 }
@@ -149,4 +159,35 @@ model Note {
   createdAt        DateTime @default(now())
 
   @@index([studentId, date])
+}
+
+/// Danh mục cộng/trừ điểm thi đua của lớp (vd: "Đi học trễ" -2)
+model EmulationCategory {
+  id        String    @id @default(cuid())
+  classId   String
+  classroom Classroom @relation(fields: [classId], references: [id], onDelete: Cascade)
+  name      String
+  points    Int
+  sortOrder Int       @default(0)
+
+  @@index([classId])
+}
+
+/// Một lần ghi điểm thi đua cho cả tổ hoặc một học sinh. Nội dung và điểm được
+/// chụp lại lúc ghi, nên sửa danh mục hay xóa học sinh không làm đổi điểm cũ của tổ.
+model EmulationRecord {
+  id        String    @id @default(cuid())
+  classId   String
+  classroom Classroom @relation(fields: [classId], references: [id], onDelete: Cascade)
+  groupNo   Int
+  studentId String?
+  student   Student?  @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  content   String
+  points    Int
+  date      DateTime
+  authorId  String?
+  author    User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt DateTime  @default(now())
+
+  @@index([classId, date])
 }
