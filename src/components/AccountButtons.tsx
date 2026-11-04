@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { resetPasswordAction, toggleActiveAction } from "@/lib/accountActions";
+import { deleteStudentAction, resetPasswordAction, toggleActiveAction } from "@/lib/accountActions";
 import { SubmitButton } from "./SubmitButton";
 
 export function ResetPasswordButton({ userId, name }: { userId: string; name: string }) {
@@ -38,6 +38,20 @@ export function ToggleActiveButton({ userId, active, name }: { userId: string; a
         confirm={active ? `Khóa tài khoản ${name}? Người này sẽ không đăng nhập được.` : undefined}
       >
         {active ? "Khóa" : "Mở khóa"}
+      </SubmitButton>
+    </form>
+  );
+}
+
+export function DeleteStudentButton({ userId, name }: { userId: string; name: string }) {
+  return (
+    <form action={deleteStudentAction.bind(null, userId)} className="inline">
+      <SubmitButton
+        className="btn-danger btn-sm"
+        pendingText="..."
+        confirm={`Xóa vĩnh viễn tài khoản ${name}?\n\nToàn bộ phiếu đã nộp, nhận xét và ghi chú của học sinh này sẽ bị xóa và KHÔNG khôi phục được.\nNếu chỉ muốn tạm chặn đăng nhập, hãy dùng nút "Khóa".`}
+      >
+        Xóa
       </SubmitButton>
     </form>
   );

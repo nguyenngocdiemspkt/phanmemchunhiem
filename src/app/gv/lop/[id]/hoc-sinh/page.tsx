@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireClassAccess } from "@/lib/auth";
 import { Badge, Empty } from "@/components/ui";
-import { ResetPasswordButton, ToggleActiveButton } from "@/components/AccountButtons";
+import { DeleteStudentButton, ResetPasswordButton, ToggleActiveButton } from "@/components/AccountButtons";
 import { AddStudentForm, ImportStudentsForm } from "./StudentForms";
 
 // Nhập file Excel lớn cần thêm thời gian xử lý
@@ -79,6 +79,7 @@ export default async function ClassStudentsPage({ params }: { params: Promise<{ 
                     <div className="flex flex-wrap gap-1">
                       <ResetPasswordButton userId={s.user.id} name={s.user.fullName} />
                       <ToggleActiveButton userId={s.user.id} active={s.user.active} name={s.user.fullName} />
+                      <DeleteStudentButton userId={s.user.id} name={s.user.fullName} />
                     </div>
                   </td>
                 </tr>

@@ -36,3 +36,11 @@ export async function toggleActiveAction(userId: string) {
   await prisma.user.update({ where: { id: userId }, data: { active: !target.active } });
   revalidatePath("/", "layout");
 }
+
+/** Xóa hẳn tài khoản học sinh, kèm hồ sơ, phiếu đã nộp, nhận xét và ghi chú (cascade). */
+export async function deleteStudentAction(userId: string) {
+  const target = await canManage(userId);
+  if (!target || target.role !== "STUDENT") return;
+  await prisma.user.delete({ where: { id: userId } });
+  revalidatePath("/", "layout");
+}
