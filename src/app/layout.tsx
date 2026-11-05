@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Sổ chủ nhiệm",
-  description: "Phần mềm quản lý lớp chủ nhiệm và phiếu tự đánh giá tuần",
+  title: "Class Master – Quản lý lớp chủ nhiệm",
+  description: "Hệ thống quản lý lớp chủ nhiệm thông minh: tự đánh giá tuần, thi đua tổ, theo dõi tiến bộ",
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };

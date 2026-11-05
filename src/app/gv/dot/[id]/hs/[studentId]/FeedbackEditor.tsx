@@ -8,13 +8,16 @@ export function FeedbackEditor({
   responseId,
   initial,
   draft,
-  published,
+  status,
+  reviewNote,
 }: {
   responseId: string;
   initial: { content: string; goals: string[] } | null;
   draft: { content: string; goals: string[] };
-  published: boolean;
+  status: "SUBMITTED" | "REVISION" | "APPROVED";
+  reviewNote: string | null;
 }) {
+  const approved = status === "APPROVED";
   const [state, action, pending] = useActionState(saveFeedbackAction.bind(null, responseId), null);
   const [content, setContent] = useState(initial?.content ?? "");
   const [goals, setGoals] = useState<string[]>(initial?.goals.length ? initial.goals : [""]);
@@ -78,18 +81,46 @@ export function FeedbackEditor({
 
       <FormMessage state={state} />
       <div className="flex flex-wrap gap-2">
-        <button name="intent" value="publish" className="btn-primary" disabled={pending}>
-          {published ? "Cập nhật & gửi lại" : "Gửi cho học sinh"}
+        <button name="intent" value="approve" className="btn-primary" disabled={pending}>
+          {approved ? "Cập nhật & công bố lại" : "✓ Duyệt & công bố"}
         </button>
         <button name="intent" value="draft" className="btn-secondary" disabled={pending}>
           Lưu nháp
         </button>
-        {published && (
-          <button name="intent" value="unpublish" className="btn-danger" disabled={pending}>
-            Thu hồi
+        {approved && (
+          <button
+            name="intent"
+            value="unapprove"
+            className="btn-danger"
+            disabled={pending}
+            onClick={(e) => {
+              if (!confirm("Hủy duyệt? Học sinh và phụ huynh sẽ không còn thấy kết quả cho tới khi duyệt lại.")) e.preventDefault();
+            }}
+          >
+            Hủy duyệt
           </button>
         )}
       </div>
+      <p className="text-xs text-slate-500">
+        Duyệt = khóa phiếu (học sinh không sửa được nữa) và công bố điểm, nhận xét cho học sinh và phụ huynh. Nhận xét không bắt buộc.
+      </p>
+
+      {!approved && (
+        <details className="rounded-lg border border-amber-200 bg-amber-50 p-3" open={status === "REVISION"}>
+          <summary className="cursor-pointer text-sm font-medium text-amber-900">
+            {status === "REVISION" ? "Đã yêu cầu học sinh sửa phiếu" : "Yêu cầu học sinh sửa / bổ sung"}
+          </summary>
+          <textarea
+            name="reviewNote"
+            className="input mt-2 min-h-20"
+            defaultValue={reviewNote ?? ""}
+            placeholder="vd: Em khai thiếu lần đi trễ thứ Năm, em xem lại và bổ sung nhé."
+          />
+          <button name="intent" value="revision" className="btn-secondary mt-2" disabled={pending}>
+            Gửi yêu cầu sửa
+          </button>
+        </details>
+      )}
     </form>
   );
 }

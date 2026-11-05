@@ -1,20 +1,27 @@
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { removeDiacritics } from "@/lib/format";
 import { Badge, PageHeader } from "@/components/ui";
 import { ResetPasswordButton, ToggleActiveButton } from "@/components/AccountButtons";
 import { CreateTeacherForm } from "./CreateTeacherForm";
+import { EditTeacherForm } from "./EditTeacherForm";
 
-export default async function TeachersPage() {
+export default async function TeachersPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const me = await requireUser(["ADMIN"]);
-  const users = await prisma.user.findMany({
+  const q = removeDiacritics((await searchParams).q?.trim() ?? "");
+  const all = await prisma.user.findMany({
     where: { role: { in: ["TEACHER", "ADMIN"] } },
     orderBy: [{ role: "desc" }, { fullName: "asc" }],
-    include: { homeroomClasses: { select: { name: true, schoolYear: true }, orderBy: { name: "asc" } } },
+    include: { homeroomClasses: { select: { name: true, schoolYear: true }, orderBy: [{ schoolYear: "desc" }, { name: "asc" }] } },
   });
+  // Tìm không dấu theo họ tên, tên đăng nhập, SĐT
+  const users = q
+    ? all.filter((u) => removeDiacritics([u.fullName, u.username, u.phone ?? "", u.email ?? ""].join(" ")).includes(q))
+    : all;
 
   return (
     <>
-      <PageHeader title="Giáo viên & quản trị" subtitle={`${users.length} tài khoản`} />
+      <PageHeader title="Giáo viên & quản trị" subtitle={`${all.length} tài khoản`} />
 
       <details className="card mb-6">
         <summary className="cursor-pointer font-semibold">+ Thêm tài khoản giáo viên</summary>
@@ -22,6 +29,11 @@ export default async function TeachersPage() {
           <CreateTeacherForm />
         </div>
       </details>
+
+      <form className="mb-3 flex max-w-md gap-2">
+        <input name="q" defaultValue={(await searchParams).q ?? ""} className="input" placeholder="Tìm theo tên, tên đăng nhập, SĐT..." />
+        <button className="btn-secondary">Tìm</button>
+      </form>
 
       <div className="card overflow-x-auto p-0 sm:p-0">
         <table className="table">
@@ -51,12 +63,15 @@ export default async function TeachersPage() {
                 </td>
                 <td>{u.homeroomClasses.map((c) => `${c.name} (${c.schoolYear})`).join(", ") || "—"}</td>
                 <td>
-                  {u.id !== me.id && (
-                    <div className="flex flex-wrap gap-1">
-                      <ResetPasswordButton userId={u.id} name={u.fullName} />
-                      <ToggleActiveButton userId={u.id} active={u.active} name={u.fullName} />
-                    </div>
-                  )}
+                  <div className="flex flex-wrap items-start gap-1">
+                    <EditTeacherForm user={u} />
+                    {u.id !== me.id && (
+                      <>
+                        <ResetPasswordButton userId={u.id} name={u.fullName} />
+                        <ToggleActiveButton userId={u.id} active={u.active} name={u.fullName} />
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

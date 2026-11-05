@@ -22,8 +22,9 @@ export function fmtDate(d: Date) {
   }).format(d);
 }
 
+/** "dd/mm" (vi-VN không kèm năm lại ra "dd-mm", nên cắt từ ngày đầy đủ) */
 export function fmtShortDate(d: Date) {
-  return new Intl.DateTimeFormat("vi-VN", { timeZone: TZ, day: "2-digit", month: "2-digit" }).format(d);
+  return fmtDate(d).slice(0, 5);
 }
 
 /** Date -> giá trị cho <input type="datetime-local"> theo giờ VN */
@@ -49,7 +50,29 @@ export function fromDateInput(value: string): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-export type SurveyStatus = "upcoming" | "open" | "closed";
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** 0h thứ Hai (giờ VN) của tuần chứa d */
+export function weekStart(d: Date) {
+  const local = new Date(d.getTime() + TZ_OFFSET_MS);
+  const sinceMonday = (local.getUTCDay() + 6) % 7;
+  return new Date(
+    Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() - sinceMonday) - TZ_OFFSET_MS,
+  );
+}
+
+export function addDays(d: Date, days: number) {
+  return new Date(d.getTime() + days * DAY_MS);
+}
+
+/** "2026-11-02" (thứ Hai) -> khoảng [thứ Hai, thứ Hai tuần sau); sai định dạng thì lấy tuần hiện tại */
+export function weekRange(param?: string) {
+  const parsed = param ? fromDateInput(param) : null;
+  const start = weekStart(parsed ?? new Date());
+  return { start, end: addDays(start, 7) };
+}
+
+export type SurveyStatus ="upcoming" | "open" | "closed";
 
 export function surveyStatus(s: { openAt: Date; closeAt: Date }, now = new Date()): SurveyStatus {
   if (now < s.openAt) return "upcoming";

@@ -6,6 +6,8 @@ import { prisma } from "@/lib/db";
 import { requireClassAccess, requireUser } from "@/lib/auth";
 import { fromLocalInput } from "@/lib/format";
 import { parseQuestions } from "@/lib/questions";
+import { ensureCategories } from "@/lib/emulation";
+import { audit } from "@/lib/audit";
 
 export type SurveyFormState = { error?: string; ok?: string } | null;
 
@@ -33,18 +35,33 @@ export async function createSurveyAction(_prev: SurveyFormState, formData: FormD
 
   const classIds = [...new Set(formData.getAll("classIds").map(String))];
   if (classIds.length === 0) return { error: "Vui lòng chọn ít nhất một lớp." };
-  for (const classId of classIds) await requireClassAccess(classId);
+  const classrooms = [];
+  for (const classId of classIds) classrooms.push((await requireClassAccess(classId)).classroom);
 
-  await prisma.survey.createMany({
-    data: classIds.map((classId) => ({
-      classId,
+  // Chấm điểm theo tiêu chí: chụp bộ tiêu chí riêng của từng lớp vào đợt
+  const scoring = formData.get("scoring") === "on";
+  const data = [];
+  for (const c of classrooms) {
+    const criteria = scoring ? (await ensureCategories(c.id)).map((x) => ({ id: x.id, name: x.name, points: x.points })) : null;
+    data.push({
+      classId: c.id,
       title,
       templateId: template.id,
       questions,
       openAt: times.openAt,
       closeAt: times.closeAt,
-    })),
-  });
+      ...(criteria ? { criteria, baseScore: c.baseScore } : {}),
+    });
+  }
+  await prisma.survey.createMany({ data });
+  for (const c of classrooms) {
+    await audit(user, "survey.create", {
+      entity: "Classroom",
+      entityId: c.id,
+      classId: c.id,
+      summary: `Tạo đợt "${title}" cho lớp ${c.name}${scoring ? " (có chấm điểm theo tiêu chí)" : ""}`,
+    });
+  }
   for (const classId of classIds) revalidatePath(`/gv/lop/${classId}`, "layout");
   return { ok: `Đã tạo đợt "${title}" cho ${classIds.length} lớp.` };
 }
@@ -81,7 +98,59 @@ export async function closeSurveyNowAction(surveyId: string) {
 
 export async function deleteSurveyAction(surveyId: string) {
   const survey = await requireSurvey(surveyId);
+  const user = await requireUser(["TEACHER", "ADMIN"]);
+  // Phiếu đã duyệt không bị xóa nếu không có quyền quản trị
+  const approved = await prisma.response.count({ where: { surveyId, status: "APPROVED" } });
+  if (approved > 0 && user.role !== "ADMIN") return;
+  const total = await prisma.response.count({ where: { surveyId } });
+  await audit(user, "survey.delete", {
+    entity: "Survey",
+    entityId: surveyId,
+    classId: survey.classId,
+    summary: `Xóa đợt "${survey.title}" (${total} phiếu, ${approved} đã duyệt)`,
+  });
   await prisma.survey.delete({ where: { id: survey.id } });
   revalidatePath(`/gv/lop/${survey.classId}`, "layout");
   redirect(`/gv/lop/${survey.classId}/dot`);
+}
+
+export type ApproveAllState = { error?: string; ok?: string } | null;
+
+/**
+ * Duyệt hàng loạt các phiếu đang chờ duyệt: khóa phiếu + công bố. Phiếu còn bổ sung của tổ trưởng
+ * chưa xác nhận thì bỏ qua để GV xem riêng.
+ */
+export async function approveAllAction(surveyId: string, _prev: ApproveAllState): Promise<ApproveAllState> {
+  const survey = await requireSurvey(surveyId);
+  const user = await requireUser(["TEACHER", "ADMIN"]);
+  const [waiting, pendingReports] = await Promise.all([
+    prisma.response.findMany({ where: { surveyId, status: "SUBMITTED" }, select: { id: true, studentId: true } }),
+    prisma.scoreReport.findMany({ where: { surveyId, status: "PENDING" }, select: { studentId: true } }),
+  ]);
+  const blocked = new Set(pendingReports.map((r) => r.studentId));
+  const ready = waiting.filter((r) => !blocked.has(r.studentId));
+  if (ready.length === 0) {
+    return { error: waiting.length ? "Các phiếu chờ duyệt đều còn bổ sung của tổ trưởng chưa xác nhận." : "Không có phiếu nào đang chờ duyệt." };
+  }
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.response.updateMany({ where: { id: { in: ready.map((r) => r.id) } }, data: { status: "APPROVED", reviewedAt: now, reviewNote: null } }),
+    ...ready.map((r) =>
+      prisma.feedback.upsert({
+        where: { responseId: r.id },
+        create: { responseId: r.id, content: "", goals: [], teacherId: user.id, published: true, publishedAt: now },
+        update: { published: true, publishedAt: now, teacherId: user.id },
+      }),
+    ),
+  ]);
+  await audit(user, "survey.approve-all", {
+    entity: "Survey",
+    entityId: surveyId,
+    classId: survey.classId,
+    summary: `Duyệt hàng loạt ${ready.length} phiếu đợt "${survey.title}"`,
+  });
+  revalidatePath(`/gv/dot/${surveyId}`, "layout");
+  revalidatePath("/hs", "layout");
+  const skipped = waiting.length - ready.length;
+  return { ok: `Đã duyệt ${ready.length} phiếu.${skipped ? ` Còn ${skipped} phiếu có bổ sung của tổ trưởng chờ xác nhận.` : ""}` };
 }

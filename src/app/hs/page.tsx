@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { groupName, RESPONSE_STATUS } from "@/lib/scoring";
 import { prisma } from "@/lib/db";
 import { requireStudent } from "@/lib/auth";
 import { fmtDateTime, surveyStatus } from "@/lib/format";
@@ -12,12 +13,22 @@ export default async function StudentHome({ searchParams }: { searchParams: Prom
 
   const [surveys, latestFeedback] = await Promise.all([
     prisma.survey.findMany({
-      where: { classId: student.classId, closeAt: { gte: now } },
+      // Phiếu còn hạn + phiếu thầy/cô yêu cầu sửa (kể cả đã hết hạn)
+      where: {
+        classId: student.classId,
+        OR: [{ closeAt: { gte: now } }, { responses: { some: { studentId: student.id, status: "REVISION" } } }],
+      },
       orderBy: { closeAt: "asc" },
-      select: { id: true, title: true, openAt: true, closeAt: true, responses: { where: { studentId: student.id }, select: { id: true } } },
+      select: {
+        id: true,
+        title: true,
+        openAt: true,
+        closeAt: true,
+        responses: { where: { studentId: student.id }, select: { id: true, status: true } },
+      },
     }),
     prisma.feedback.findFirst({
-      where: { published: true, response: { studentId: student.id } },
+      where: { published: true, content: { not: "" }, response: { studentId: student.id } },
       orderBy: { publishedAt: "desc" },
       include: { response: { select: { survey: { select: { title: true } } } }, teacher: { select: { fullName: true } } },
     }),
@@ -36,6 +47,13 @@ export default async function StudentHome({ searchParams }: { searchParams: Prom
         </p>
       )}
 
+      {student.isGroupLeader && student.groupNo && (
+        <Link href="/hs/to-truong" className="card block border-violet-200 bg-violet-50 hover:bg-violet-100">
+          <div className="font-semibold text-violet-900">Em là tổ trưởng {groupName(student.classroom.groupNames, student.groupNo)}</div>
+          <div className="text-sm text-violet-800">Xem bảng tự chấm điểm của lớp, nhận xét và bổ sung vi phạm cho tổ viên →</div>
+        </Link>
+      )}
+
       <section className="card">
         <h2 className="mb-3 font-semibold">Phiếu tự đánh giá</h2>
         {surveys.length === 0 ? (
@@ -45,6 +63,7 @@ export default async function StudentHome({ searchParams }: { searchParams: Prom
             {surveys.map((s) => {
               const status = surveyStatus(s, now);
               const done = s.responses.length > 0;
+              const rs = s.responses[0]?.status;
               return (
                 <li key={s.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-3">
                   <div>
@@ -53,11 +72,18 @@ export default async function StudentHome({ searchParams }: { searchParams: Prom
                       {status === "upcoming" ? `Mở lúc ${fmtDateTime(s.openAt)}` : `Hạn nộp ${fmtDateTime(s.closeAt)}`}
                     </div>
                   </div>
-                  {status === "open" ? (
+                  {rs === "REVISION" ? (
                     <div className="flex items-center gap-2">
-                      {done && <Badge className="bg-emerald-100 text-emerald-800 ring-emerald-200">Đã nộp</Badge>}
+                      <Badge className={RESPONSE_STATUS.REVISION.style}>Thầy/cô nhờ em sửa</Badge>
+                      <Link href={`/hs/phieu/${s.id}`} className="btn-primary btn-sm">
+                        Sửa phiếu
+                      </Link>
+                    </div>
+                  ) : status === "open" ? (
+                    <div className="flex items-center gap-2">
+                      {rs && <Badge className={RESPONSE_STATUS[rs].style}>{rs === "SUBMITTED" ? "Đã nộp, chờ duyệt" : RESPONSE_STATUS[rs].label}</Badge>}
                       <Link href={`/hs/phieu/${s.id}`} className={done ? "btn-secondary btn-sm" : "btn-primary"}>
-                        {done ? "Xem / sửa" : "Làm phiếu"}
+                        {!done ? "Làm phiếu" : rs === "APPROVED" ? "Xem kết quả" : "Xem / sửa"}
                       </Link>
                     </div>
                   ) : (

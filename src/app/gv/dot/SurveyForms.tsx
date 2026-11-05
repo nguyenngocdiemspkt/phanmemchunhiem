@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { FormMessage } from "@/components/ui";
-import { createSurveyAction, updateSurveyAction } from "./actions";
+import { approveAllAction, createSurveyAction, updateSurveyAction } from "./actions";
 
 export function CreateSurveyForm({
   classes,
@@ -61,6 +61,15 @@ export function CreateSurveyForm({
         <label className="label">Đóng phiếu lúc *</label>
         <input name="closeAt" type="datetime-local" className="input" defaultValue={defaults.closeAt} required />
       </div>
+      <label className="flex items-start gap-2 text-sm sm:col-span-2">
+        <input type="checkbox" name="scoring" defaultChecked className="mt-0.5" />
+        <span>
+          <b>Kèm chấm điểm theo tiêu chí thi đua của lớp</b>
+          <span className="block text-xs text-slate-500">
+            Học sinh khai số lần theo từng tiêu chí, điểm tuần = điểm gốc + cộng/trừ. Phiếu đã duyệt được cộng vào điểm thi đua của tổ.
+          </span>
+        </span>
+      </label>
       <div className="flex items-center gap-3 sm:col-span-2">
         <button className="btn-primary" disabled={pending}>
           {pending ? "Đang tạo..." : "Tạo đợt"}
@@ -101,6 +110,24 @@ export function EditSurveyForm({
       <div className="sm:col-span-3">
         <FormMessage state={state} />
       </div>
+    </form>
+  );
+}
+
+export function ApproveAllButton({ surveyId, waiting }: { surveyId: string; waiting: number }) {
+  const [state, action, pending] = useActionState(approveAllAction.bind(null, surveyId), null);
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-3">
+      <button
+        className="btn-primary"
+        disabled={pending || waiting === 0}
+        onClick={(e) => {
+          if (!confirm(`Duyệt và công bố ${waiting} phiếu đang chờ? Học sinh sẽ không sửa được phiếu đã duyệt.`)) e.preventDefault();
+        }}
+      >
+        {pending ? "Đang duyệt..." : `✓ Duyệt tất cả (${waiting} phiếu chờ duyệt)`}
+      </button>
+      <FormMessage state={state} />
     </form>
   );
 }

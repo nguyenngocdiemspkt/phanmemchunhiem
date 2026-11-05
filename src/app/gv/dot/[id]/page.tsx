@@ -7,27 +7,44 @@ import { parseAnswers, parseQuestions } from "@/lib/questions";
 import { flagRank, studentFlags } from "@/lib/insights";
 import { Badge, FlagList, PageHeader, ProgressBar, StatusBadge } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
-import { EditSurveyForm } from "../SurveyForms";
+import { ApproveAllButton, EditSurveyForm } from "../SurveyForms";
+import { groupName, parseCriteria, rating, RESPONSE_STATUS } from "@/lib/scoring";
 import { closeSurveyNowAction, deleteSurveyAction } from "../actions";
+import { ParentNotifyButtons } from "@/components/ParentNotify";
+import { buildParentMessage, ensureParentTokens, parentLink, siteUrl, smsPhone } from "@/lib/parent";
 
 export default async function SurveyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const survey = await prisma.survey.findUnique({ where: { id }, include: { classroom: true } });
   if (!survey) notFound();
-  await requireClassAccess(survey.classId);
+  const { user } = await requireClassAccess(survey.classId);
 
-  const [students, responses, prevSurvey] = await Promise.all([
+  const [students, responses, prevSurvey, pendingReports] = await Promise.all([
     prisma.student.findMany({
       where: { classId: survey.classId, OR: [{ user: { active: true } }, { responses: { some: { surveyId: id } } }] },
       include: { user: { select: { fullName: true } } },
     }),
-    prisma.response.findMany({ where: { surveyId: id }, include: { feedback: true } }),
+    prisma.response.findMany({
+      where: { surveyId: id },
+      include: { feedback: { include: { teacher: { select: { fullName: true } } } } },
+    }),
     prisma.survey.findFirst({
       where: { classId: survey.classId, openAt: { lt: survey.openAt } },
       orderBy: { openAt: "desc" },
       select: { responses: { select: { studentId: true, score: true, urgent: true, answers: true } } },
     }),
+    prisma.scoreReport.groupBy({ by: ["studentId"], where: { surveyId: id, status: "PENDING" }, _count: true }),
   ]);
+  const scoring = parseCriteria(survey.criteria).length > 0;
+  const pendingMap = new Map(pendingReports.map((p) => [p.studentId, p._count]));
+  const waiting = responses.filter((r) => r.status === "SUBMITTED").length;
+  const approvedCount = responses.filter((r) => r.status === "APPROVED").length;
+  // Tổng điểm thi đua của từng tổ trong đợt này (chỉ tính phiếu đã duyệt)
+  const groupRows = Array.from({ length: survey.classroom.groupCount }, (_, i) => {
+    const members = students.filter((s) => s.groupNo === i + 1);
+    const approved = members.map((m) => responses.find((r) => r.studentId === m.id)).filter((r) => r?.status === "APPROVED" && r.points != null);
+    return { no: i + 1, members: members.length, approved: approved.length, total: approved.reduce((sum, r) => sum + r!.points!, 0) };
+  });
 
   const questions = parseQuestions(survey.questions);
   const responseMap = new Map(responses.map((r) => [r.studentId, r]));
@@ -49,6 +66,27 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
     );
   const nameOf = new Map(students.map((s) => [s.id, s.user.fullName]));
 
+  // Tin báo phụ huynh cho các em đã được gửi nhận xét
+  const notifiable = rows.filter((x) => x.r?.status === "APPROVED" && x.r.feedback?.published);
+  const tokens = await ensureParentTokens(notifiable.map((x) => x.st));
+  const base = await siteUrl();
+  const parentMessages = new Map(
+    notifiable.map(({ st, r }) => [
+      st.id,
+      buildParentMessage({
+        className: survey.classroom.name,
+        studentName: st.user.fullName,
+        surveyTitle: survey.title,
+        score: r!.score,
+        points: r!.points != null ? { value: r!.points, rating: rating(r!.points, survey.classroom).label } : null,
+        feedback: r!.feedback!.content,
+        teacherName: r!.feedback!.teacher?.fullName,
+        link: parentLink(base, tokens.get(st.id)!),
+      }),
+    ]),
+  );
+  const notifiedCount = notifiable.filter((x) => x.r!.feedback!.parentNotifiedAt).length;
+
   return (
     <>
       <PageHeader
@@ -66,10 +104,40 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
         <div className="card">
           <ProgressBar value={rate} />
           <div className="mt-1 text-sm text-slate-600">
-            Đã nộp <b>{responses.length}</b>/{students.length} ({rate}%) · Đã gửi nhận xét{" "}
-            <b>{responses.filter((r) => r.feedback?.published).length}</b>
+            Đã nộp <b>{responses.length}</b>/{students.length} ({rate}%) · Đã duyệt <b>{approvedCount}</b> · Chờ duyệt <b>{waiting}</b> · Đã
+            báo phụ huynh <b>{notifiedCount}</b>
+          </div>
+          <div className="mt-3">
+            <ApproveAllButton surveyId={id} waiting={waiting} />
           </div>
         </div>
+
+        {scoring && (
+          <div className="card overflow-x-auto">
+            <h2 className="mb-1 font-semibold">Điểm thi đua các tổ trong đợt</h2>
+            <p className="mb-3 text-xs text-slate-500">Tổng điểm các phiếu đã duyệt của thành viên trong tổ.</p>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Tổ</th>
+                  <th className="text-center">Phiếu đã duyệt</th>
+                  <th className="text-right">Tổng điểm</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groupRows.map((g) => (
+                  <tr key={g.no}>
+                    <td>{groupName(survey.classroom.groupNames, g.no)}</td>
+                    <td className="text-center">
+                      {g.approved}/{g.members}
+                    </td>
+                    <td className="text-right font-semibold tabular-nums">{g.total}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         <div className="card overflow-x-auto p-0 sm:p-0">
           <table className="table">
@@ -77,9 +145,11 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
               <tr>
                 <th>Học sinh</th>
                 <th>Nộp lúc</th>
-                <th>Mức tự đánh giá</th>
+                <th>Trạng thái</th>
+                {scoring && <th className="text-right">Điểm thi đua</th>}
                 <th>Dấu hiệu</th>
-                <th>Nhận xét</th>
+                <th>Duyệt</th>
+                <th>Báo phụ huynh</th>
               </tr>
             </thead>
             <tbody>
@@ -91,22 +161,48 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
                     </Link>
                   </td>
                   <td className="text-xs text-slate-600">{r ? fmtDateTime(r.submittedAt) : <span className="text-slate-400">Chưa nộp</span>}</td>
-                  <td>{r?.score != null ? `${r.score}%` : "—"}</td>
+                  <td>
+                    {r ? (
+                      <Badge className={RESPONSE_STATUS[r.status].style}>{RESPONSE_STATUS[r.status].label}</Badge>
+                    ) : (
+                      <span className="text-xs text-slate-400">—</span>
+                    )}
+                    {pendingMap.get(st.id) ? (
+                      <div className="mt-1 text-xs text-amber-700">{pendingMap.get(st.id)} bổ sung của tổ trưởng chờ xác nhận</div>
+                    ) : null}
+                  </td>
+                  {scoring && (
+                    <td className="text-right">
+                      {r?.points != null ? (
+                        <span className="inline-flex items-center gap-1">
+                          <b className="tabular-nums">{r.points}</b>
+                          <Badge className={rating(r.points, survey.classroom).style}>{rating(r.points, survey.classroom).label}</Badge>
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  )}
                   <td className="max-w-xs">
                     <FlagList flags={flags} />
                   </td>
                   <td>
-                    {r && (
-                      <Link href={`/gv/dot/${id}/hs/${st.id}`} className="inline-flex items-center gap-2">
-                        {r.feedback?.published ? (
-                          <Badge className="bg-emerald-100 text-emerald-800 ring-emerald-200">Đã gửi</Badge>
-                        ) : r.feedback ? (
-                          <Badge className="bg-amber-50 text-amber-800 ring-amber-200">Bản nháp</Badge>
-                        ) : (
-                          <Badge className="bg-slate-100 text-slate-600 ring-slate-200">Chưa nhận xét</Badge>
-                        )}
-                        <span className="link text-xs">Xem →</span>
+                    {(r || scoring) && (
+                      <Link href={`/gv/dot/${id}/hs/${st.id}`} className="link text-xs">
+                        {r ? (r.status === "APPROVED" ? "Xem →" : "Duyệt →") : "Chấm thay →"}
                       </Link>
+                    )}
+                  </td>
+                  <td className="min-w-40">
+                    {r?.feedback?.published && (
+                      <ParentNotifyButtons
+                        compact
+                        feedbackId={r.feedback.id}
+                        studentId={st.id}
+                        phone={smsPhone(st.parentPhone)}
+                        message={parentMessages.get(st.id)!}
+                        notifiedAt={r.feedback.parentNotifiedAt ? fmtDateTime(r.feedback.parentNotifiedAt) : null}
+                      />
                     )}
                   </td>
                 </tr>
@@ -180,6 +276,7 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
                   </SubmitButton>
                 </form>
               )}
+              {(approvedCount === 0 || user.role === "ADMIN") && (
               <form action={deleteSurveyAction.bind(null, id)}>
                 <SubmitButton
                   className="btn-danger"
@@ -188,6 +285,7 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
                   Xóa đợt
                 </SubmitButton>
               </form>
+              )}
             </div>
           </div>
         </details>
