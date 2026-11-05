@@ -13,6 +13,7 @@ export type StudentRow = {
   parentPhone?: string;
   address?: string;
   groupNo?: string;
+  note?: string;
 };
 
 // Tiêu đề cột (đã bỏ dấu, chữ thường) -> trường dữ liệu
@@ -27,6 +28,7 @@ const HEADER_MAP: [RegExp, keyof Omit<StudentRow, "row">][] = [
   [/^(sdt phu huynh|so dien thoai phu huynh|dien thoai phu huynh|sdt|so dien thoai)$/, "parentPhone"],
   [/^(dia chi|noi o)$/, "address"],
   [/^(to|to so|nhom)$/, "groupNo"],
+  [/^(ghi chu|ghichu)$/, "note"],
 ];
 
 function cellText(v: ExcelJS.CellValue): string {
@@ -97,6 +99,8 @@ export async function buildStudentTemplate() {
     { header: "Tổ", width: 6 },
     { header: "Họ tên phụ huynh", width: 26 },
     { header: "SĐT phụ huynh", width: 16 },
+    { header: "Địa chỉ", width: 30 },
+    { header: "Ghi chú", width: 24 },
     { header: "Tên đăng nhập", width: 18 },
     { header: "Mật khẩu", width: 14 },
   ];
@@ -117,5 +121,60 @@ export async function buildStudentTemplate() {
     "Bỏ trống Mật khẩu: hệ thống tạo mật khẩu tạm 6 chữ số. Học sinh phải đổi mật khẩu khi đăng nhập lần đầu.",
     "Ví dụ: 1 | HS001 | Nguyễn Văn An | 15/03/2010 | Nam | 1 | Nguyễn Văn Bình | 0901234567 | (trống) | (trống)",
   ].forEach((line) => guide.addRow([line]));
+  return wb.xlsx.writeBuffer();
+}
+
+export type StudentExportRow = {
+  studentCode: string | null;
+  fullName: string;
+  dateOfBirth: string | null;
+  gender: string | null;
+  groupNo: number | null;
+  parentName: string | null;
+  parentPhone: string | null;
+  address: string | null;
+  note: string | null;
+  username: string;
+  status: string;
+};
+
+/** Xuất danh sách học sinh. Các cột đầu trùng file mẫu nên có thể nhập lại vào lớp khác. */
+export async function buildStudentExport(title: string, rows: StudentExportRow[]) {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Danh sách học sinh");
+  ws.columns = [
+    { header: "STT", width: 6 },
+    { header: "Mã học sinh", width: 14 },
+    { header: "Họ và tên", width: 28 },
+    { header: "Ngày sinh", width: 14 },
+    { header: "Giới tính", width: 10 },
+    { header: "Tổ", width: 6 },
+    { header: "Họ tên phụ huynh", width: 26 },
+    { header: "SĐT phụ huynh", width: 16 },
+    { header: "Địa chỉ", width: 30 },
+    { header: "Ghi chú", width: 24 },
+    { header: "Tên đăng nhập", width: 18 },
+    { header: "Trạng thái", width: 14 },
+  ];
+  ws.getRow(1).font = { bold: true };
+  for (const col of [2, 4, 8]) ws.getColumn(col).numFmt = "@";
+  rows.forEach((r, i) =>
+    ws.addRow([
+      i + 1,
+      r.studentCode ?? "",
+      r.fullName,
+      r.dateOfBirth ?? "",
+      r.gender ?? "",
+      r.groupNo ?? "",
+      r.parentName ?? "",
+      r.parentPhone ?? "",
+      r.address ?? "",
+      r.note ?? "",
+      r.username,
+      r.status,
+    ]),
+  );
+  ws.views = [{ state: "frozen", ySplit: 1 }];
+  wb.title = title;
   return wb.xlsx.writeBuffer();
 }

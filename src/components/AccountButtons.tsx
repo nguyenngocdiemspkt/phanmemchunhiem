@@ -49,7 +49,7 @@ export function DeleteStudentButton({ userId, name }: { userId: string; name: st
       <SubmitButton
         className="btn-danger btn-sm"
         pendingText="..."
-        confirm={`Xóa vĩnh viễn tài khoản ${name}?\n\nToàn bộ phiếu đã nộp, nhận xét và ghi chú của học sinh này sẽ bị xóa và KHÔNG khôi phục được.\nNếu chỉ muốn tạm chặn đăng nhập, hãy dùng nút "Khóa".`}
+        confirm={`Xóa vĩnh viễn tài khoản ${name}?\n\nToàn bộ phiếu đã nộp, nhận xét và ghi chú của học sinh này sẽ bị xóa khỏi hệ thống (bản chụp được lưu trong Nhật ký thao tác).\nNếu học sinh nghỉ học hoặc chuyển trường, hãy đổi trạng thái thay vì xóa.`}
       >
         Xóa
       </SubmitButton>

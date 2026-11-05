@@ -51,6 +51,8 @@ export function buildParentMessage(p: {
   studentName: string;
   surveyTitle: string;
   score: number | null;
+  /** Điểm thi đua tuần và xếp loại (đợt có chấm điểm theo tiêu chí) */
+  points?: { value: number; rating: string } | null;
   feedback: string;
   teacherName?: string | null;
   link: string;
@@ -58,7 +60,8 @@ export function buildParentMessage(p: {
   return [
     `[Lớp ${p.className}] Kính gửi phụ huynh em ${p.studentName}.`,
     `Phiếu tự đánh giá "${p.surveyTitle}"${p.score != null ? `: em tự đánh giá ${p.score}%` : ""}.`,
-    `Nhận xét của GVCN: ${excerpt(p.feedback, 140)}`,
+    p.points ? `Điểm thi đua tuần: ${p.points.value} (${p.points.rating}).` : "",
+    p.feedback.trim() ? `Nhận xét của GVCN: ${excerpt(p.feedback, 140)}` : "",
     `Xem chi tiết: ${p.link}`,
     p.teacherName ? `GVCN ${p.teacherName}` : "",
   ]

@@ -5,6 +5,7 @@ import { prisma } from "./db";
 import { requireClassAccess } from "./auth";
 import { fromDateInput } from "./format";
 import { MAX_GROUPS, monitorCanEdit, requireEmulationAccess } from "./emulation";
+import { audit } from "./audit";
 
 export type EmulationState = { error?: string; ok?: string } | null;
 
@@ -80,16 +81,19 @@ export async function saveGroupsAction(classId: string, _prev: EmulationState, f
   if (!Number.isInteger(groupCount) || groupCount < 1 || groupCount > MAX_GROUPS) {
     return { error: `Số tổ phải từ 1 đến ${MAX_GROUPS}.` };
   }
-  const students = await prisma.student.findMany({ where: { classId }, select: { id: true } });
+  const students = await prisma.student.findMany({ where: { classId }, select: { id: true, groupNo: true } });
   await prisma.$transaction([
     prisma.classroom.update({ where: { id: classId }, data: { groupCount } }),
     ...students.map((s) => {
       const g = Number(formData.get(`group_${s.id}`));
+      const groupNo = Number.isInteger(g) && g >= 1 && g <= groupCount ? g : null;
       return prisma.student.update({
         where: { id: s.id },
         data: {
-          groupNo: Number.isInteger(g) && g >= 1 && g <= groupCount ? g : null,
+          groupNo,
           isMonitor: formData.get(`monitor_${s.id}`) === "on",
+          // Đổi tổ thì thôi làm tổ trưởng tổ cũ
+          ...(groupNo !== s.groupNo ? { isGroupLeader: false } : {}),
         },
       });
     }),
@@ -118,7 +122,7 @@ export async function saveCategoriesAction(classId: string, _prev: EmulationStat
     }
     categories.push({ name, points });
   }
-  if (categories.length === 0) return { error: "Cần ít nhất một nội dung thi đua." };
+  if (categories.length === 0) return { error: "Cần ít nhất một tiêu chí." };
   if (categories.length > 100) return { error: "Tối đa 100 nội dung." };
 
   await prisma.$transaction([
@@ -126,5 +130,25 @@ export async function saveCategoriesAction(classId: string, _prev: EmulationStat
     prisma.emulationCategory.createMany({ data: categories.map((c, i) => ({ ...c, classId, sortOrder: i })) }),
   ]);
   revalidateEmulation(classId);
-  return { ok: "Đã lưu danh mục." };
+  return { ok: "Đã lưu tiêu chí." };
+}
+
+/** Điểm gốc mỗi tuần và ngưỡng xếp loại Tốt / Khá / Đạt của lớp (áp dụng cho các đợt tạo sau) */
+export async function saveScoringSettingsAction(classId: string, _prev: EmulationState, formData: FormData): Promise<EmulationState> {
+  const { user, classroom } = await requireClassAccess(classId);
+  const num = (k: string) => Number(formData.get(k));
+  const data = { baseScore: num("baseScore"), ratingGood: num("ratingGood"), ratingFair: num("ratingFair"), ratingPass: num("ratingPass") };
+  if (Object.values(data).some((v) => !Number.isInteger(v) || v < 0 || v > 1000)) return { error: "Các mức điểm phải là số nguyên từ 0 đến 1000." };
+  if (!(data.ratingGood >= data.ratingFair && data.ratingFair >= data.ratingPass)) {
+    return { error: "Ngưỡng phải giảm dần: Tốt ≥ Khá ≥ Đạt." };
+  }
+  await prisma.classroom.update({ where: { id: classId }, data });
+  await audit(user, "class.scoring", {
+    classId,
+    entity: "Classroom",
+    entityId: classId,
+    summary: `Lớp ${classroom.name}: điểm gốc ${data.baseScore}, Tốt ≥ ${data.ratingGood}, Khá ≥ ${data.ratingFair}, Đạt ≥ ${data.ratingPass}`,
+  });
+  revalidateEmulation(classId);
+  return { ok: "Đã lưu. Điểm gốc mới áp dụng cho các đợt tạo từ bây giờ; ngưỡng xếp loại áp dụng ngay." };
 }

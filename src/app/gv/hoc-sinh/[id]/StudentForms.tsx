@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { FormMessage } from "@/components/ui";
-import { addNoteAction, updateProfileAction } from "./actions";
+import { addNoteAction, setStudentStatusAction, transferStudentAction, updateProfileAction } from "./actions";
 
 type Profile = {
   fullName: string;
@@ -12,6 +12,7 @@ type Profile = {
   address: string;
   parentName: string;
   parentPhone: string;
+  note: string;
 };
 
 export function ProfileForm({ studentId, profile }: { studentId: string; profile: Profile }) {
@@ -38,6 +39,7 @@ export function ProfileForm({ studentId, profile }: { studentId: string; profile
       {field("parentName", "Họ tên phụ huynh")}
       {field("parentPhone", "SĐT phụ huynh")}
       <div className="sm:col-span-2">{field("address", "Địa chỉ")}</div>
+      <div className="sm:col-span-2">{field("note", "Ghi chú (học sinh và phụ huynh không thấy)")}</div>
       <div className="flex items-center gap-3 sm:col-span-2">
         <button className="btn-primary" disabled={pending}>
           {pending ? "Đang lưu..." : "Lưu thông tin"}
@@ -78,6 +80,64 @@ export function AddNoteForm({ studentId, today }: { studentId: string; today: st
         <button className="btn-primary" disabled={pending}>
           {pending ? "Đang lưu..." : "Thêm ghi nhận"}
         </button>
+        <FormMessage state={state} />
+      </div>
+    </form>
+  );
+}
+
+export function StatusForm({ studentId, status }: { studentId: string; status: string }) {
+  const [state, action, pending] = useActionState(setStudentStatusAction.bind(null, studentId), null);
+  return (
+    <form action={action} className="grid gap-3 sm:grid-cols-[12rem_1fr_auto]">
+      <select name="status" className="input" defaultValue={status}>
+        <option value="ACTIVE">Đang học</option>
+        <option value="TRANSFERRED">Chuyển trường</option>
+        <option value="LEFT">Nghỉ học</option>
+      </select>
+      <input name="reason" className="input" placeholder="Lý do (không bắt buộc)" />
+      <button
+        className="btn-primary"
+        disabled={pending}
+        onClick={(e) => {
+          const v = (e.currentTarget.form?.elements.namedItem("status") as HTMLSelectElement | null)?.value;
+          if (v !== "ACTIVE" && !confirm("Tài khoản học sinh sẽ bị khóa. Hồ sơ và các phiếu cũ vẫn được giữ lại. Tiếp tục?")) e.preventDefault();
+        }}
+      >
+        {pending ? "Đang lưu..." : "Cập nhật"}
+      </button>
+      <div className="sm:col-span-3">
+        <FormMessage state={state} />
+      </div>
+    </form>
+  );
+}
+
+export function TransferForm({ studentId, classes }: { studentId: string; classes: { id: string; label: string }[] }) {
+  const [state, action, pending] = useActionState(transferStudentAction.bind(null, studentId), null);
+  return (
+    <form action={action} className="grid gap-3 sm:grid-cols-[12rem_1fr_auto]">
+      <select name="toClassId" className="input" defaultValue="" required>
+        <option value="" disabled>
+          — Chọn lớp mới —
+        </option>
+        {classes.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.label}
+          </option>
+        ))}
+      </select>
+      <input name="reason" className="input" placeholder="Lý do chuyển lớp" />
+      <button
+        className="btn-primary"
+        disabled={pending}
+        onClick={(e) => {
+          if (!confirm("Chuyển học sinh sang lớp mới? Giáo viên lớp cũ sẽ không còn quản lý em này; lịch sử đánh giá được giữ nguyên.")) e.preventDefault();
+        }}
+      >
+        {pending ? "Đang chuyển..." : "Chuyển lớp"}
+      </button>
+      <div className="sm:col-span-3">
         <FormMessage state={state} />
       </div>
     </form>

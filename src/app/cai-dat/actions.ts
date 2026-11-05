@@ -5,6 +5,7 @@ import { timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
 import { DEFAULT_QUESTIONS } from "@/lib/questions";
+import { defaultYearDates, firstYearOf, suggestedYearName } from "@/lib/schoolYear";
 
 export type SetupState = { error?: string } | null;
 
@@ -47,5 +48,10 @@ export async function setupAction(_prev: SetupState, formData: FormData): Promis
       ownerId: admin.id,
     },
   });
+  // Năm học hiện tại với các mốc gợi ý, quản trị chỉnh lại ở mục Năm học
+  if ((await prisma.schoolYear.count()) === 0) {
+    const name = suggestedYearName();
+    await prisma.schoolYear.create({ data: { name, ...defaultYearDates(firstYearOf(name)!), isCurrent: true } });
+  }
   redirect("/dang-nhap");
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState, startTransition } from "react";
-import { saveCategoriesAction, saveGroupsAction } from "@/lib/emulationActions";
+import { saveCategoriesAction, saveGroupsAction, saveScoringSettingsAction } from "@/lib/emulationActions";
 import { FormMessage } from "@/components/ui";
 
 const MAX_GROUPS = 12;
@@ -145,7 +145,7 @@ export function CategoryEditor({ classId, initial }: { classId: string; initial:
             <input
               className="input"
               value={r.name}
-              placeholder="Tên nội dung, vd: Đi học trễ"
+              placeholder="Tên tiêu chí, vd: Đi học trễ"
               onChange={(e) => update(i, { name: e.target.value })}
             />
             <input
@@ -170,10 +170,43 @@ export function CategoryEditor({ classId, initial }: { classId: string; initial:
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" className="btn-secondary" onClick={() => setRows([...rows, { name: "", points: "" }])}>
-          + Thêm nội dung
+          + Thêm tiêu chí
         </button>
         <button className="btn-primary" disabled={pending}>
-          {pending ? "Đang lưu..." : "Lưu danh mục"}
+          {pending ? "Đang lưu..." : "Lưu tiêu chí"}
+        </button>
+        <FormMessage state={state} />
+      </div>
+    </form>
+  );
+}
+
+export function ScoringSettingsForm({
+  classId,
+  initial,
+}: {
+  classId: string;
+  initial: { baseScore: number; ratingGood: number; ratingFair: number; ratingPass: number };
+}) {
+  const [state, action, pending] = useActionState(saveScoringSettingsAction.bind(null, classId), null);
+  const field = (name: keyof typeof initial, label: string) => (
+    <div>
+      <label className="label">{label}</label>
+      <input name={name} type="number" min={0} max={1000} className="input w-28" defaultValue={initial[name]} required />
+    </div>
+  );
+  return (
+    <form onSubmit={submitWithoutReset(action)} className="space-y-3">
+      <div className="flex flex-wrap gap-4">
+        {field("baseScore", "Điểm gốc mỗi tuần")}
+        {field("ratingGood", "Tốt từ")}
+        {field("ratingFair", "Khá từ")}
+        {field("ratingPass", "Đạt từ")}
+      </div>
+      <p className="text-xs text-slate-500">Dưới mức Đạt là &quot;Cần cố gắng&quot;. Học sinh và phụ huynh chỉ xem được điểm của chính em.</p>
+      <div className="flex items-center gap-3">
+        <button className="btn-primary" disabled={pending}>
+          {pending ? "Đang lưu..." : "Lưu cách tính điểm"}
         </button>
         <FormMessage state={state} />
       </div>

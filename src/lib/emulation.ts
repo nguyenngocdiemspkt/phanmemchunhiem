@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "./db";
 import { requireUser } from "./auth";
 import { addDays, fmtShortDate, toDateInput, weekStart } from "./format";
+import { groupName } from "./scoring";
 
 export const MAX_GROUPS = 12;
 
@@ -57,21 +58,46 @@ export async function ensureCategories(classId: string) {
   return prisma.emulationCategory.findMany({ where: { classId }, orderBy: { sortOrder: "asc" } });
 }
 
-export type GroupStanding = { groupNo: number; members: number; plus: number; minus: number; total: number; rank: number };
+/** sheets: tổng điểm phiếu tuần đã duyệt của thành viên; plus/minus: điểm ghi trực tiếp */
+export type GroupStanding = {
+  groupNo: number;
+  name: string;
+  members: number;
+  sheets: number;
+  sheetCount: number;
+  plus: number;
+  minus: number;
+  total: number;
+  rank: number;
+};
+
+type SheetPoints = { groupNo: number | null; points: number; date: Date };
 
 function rankGroups(
   groupCount: number,
+  groupNames: unknown,
   records: { groupNo: number; points: number }[],
+  sheets: SheetPoints[],
   members: Map<number, number>,
 ): GroupStanding[] {
   const rows: GroupStanding[] = Array.from({ length: groupCount }, (_, i) => ({
     groupNo: i + 1,
+    name: groupName(groupNames, i + 1),
     members: members.get(i + 1) ?? 0,
+    sheets: 0,
+    sheetCount: 0,
     plus: 0,
     minus: 0,
     total: 0,
     rank: 0,
   }));
+  for (const sh of sheets) {
+    const row = sh.groupNo ? rows[sh.groupNo - 1] : undefined;
+    if (!row) continue;
+    row.sheets += sh.points;
+    row.sheetCount++;
+    row.total += sh.points;
+  }
   for (const r of records) {
     const row = rows[r.groupNo - 1];
     if (!row) continue;
@@ -87,9 +113,14 @@ function rankGroups(
 const CHART_WEEKS = 8;
 
 /** Toàn bộ dữ liệu cho bảng thi đua của một lớp trong một tuần. */
-export async function loadEmulationBoard(classId: string, groupCount: number, week: { start: Date; end: Date }) {
+export async function loadEmulationBoard(
+  classId: string,
+  groupCount: number,
+  week: { start: Date; end: Date },
+  groupNames: unknown = null,
+) {
   const chartFrom = addDays(week.start, -7 * (CHART_WEEKS - 1));
-  const [allRecords, weekRecords, students, categories] = await Promise.all([
+  const [allRecords, weekRecords, students, categories, approved] = await Promise.all([
     prisma.emulationRecord.findMany({ where: { classId }, select: { groupNo: true, points: true, date: true } }),
     prisma.emulationRecord.findMany({
       where: { classId, date: { gte: week.start, lt: week.end } },
@@ -104,7 +135,16 @@ export async function loadEmulationBoard(classId: string, groupCount: number, we
       select: { id: true, groupNo: true, isMonitor: true, user: { select: { fullName: true } } },
     }),
     ensureCategories(classId),
+    // Phiếu tuần đã duyệt có điểm thi đua; tính vào tổ hiện tại của học sinh, theo tuần mở đợt
+    prisma.response.findMany({
+      where: { status: "APPROVED", points: { not: null }, survey: { classId } },
+      select: { points: true, student: { select: { groupNo: true, classId: true } }, survey: { select: { openAt: true } } },
+    }),
   ]);
+  const sheets: SheetPoints[] = approved
+    .filter((r) => r.student.classId === classId)
+    .map((r) => ({ groupNo: r.student.groupNo, points: r.points!, date: r.survey.openAt }));
+  const weekSheets = sheets.filter((x) => x.date >= week.start && x.date < week.end);
 
   const lastWord = (s: string) => s.trim().split(/\s+/).at(-1) ?? s;
   students.sort(
@@ -123,17 +163,18 @@ export async function loadEmulationBoard(classId: string, groupCount: number, we
     for (let g = 1; g <= groupCount; g++) row[`g${g}`] = 0;
     return { start, end: addDays(start, 7), row };
   });
-  for (const r of allRecords) {
-    if (r.groupNo > groupCount) continue;
+  for (const r of [...allRecords, ...sheets]) {
+    if (!r.groupNo || r.groupNo > groupCount) continue;
     const bucket = chart.find((c) => r.date >= c.start && r.date < c.end);
     if (bucket) bucket.row[`g${r.groupNo}`] = (bucket.row[`g${r.groupNo}`] as number) + r.points;
   }
 
   return {
-    weekly: rankGroups(groupCount, weekRecords, members),
-    overall: rankGroups(groupCount, allRecords, members),
+    weekly: rankGroups(groupCount, groupNames, weekRecords, weekSheets, members),
+    overall: rankGroups(groupCount, groupNames, allRecords, sheets, members),
     chart: chart.map((c) => c.row),
-    hasChartData: allRecords.some((r) => r.date >= chartFrom && r.date < week.end),
+    hasChartData: [...allRecords, ...sheets].some((r) => r.date >= chartFrom && r.date < week.end),
+    groupNames: Array.from({ length: groupCount }, (_, i) => groupName(groupNames, i + 1)),
     records: weekRecords,
     students: students.map((s) => ({ id: s.id, name: s.user.fullName, groupNo: s.groupNo, isMonitor: s.isMonitor })),
     categories: categories.map((c) => ({ id: c.id, name: c.name, points: c.points })),

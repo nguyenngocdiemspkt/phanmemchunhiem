@@ -14,10 +14,16 @@ enum Role {
   STUDENT
 }
 
+enum StudentStatus {
+  ACTIVE // Đang học
+  TRANSFERRED // Chuyển trường
+  LEFT // Nghỉ học
+}
+
 enum NoteType {
   POSITIVE // Hành động tích cực
   PROGRESS // Chuyển biến / tiến bộ
-  CONCERN  // Điều cần quan tâm (chỉ giáo viên thấy)
+  CONCERN // Điều cần quan tâm (chỉ giáo viên thấy)
 }
 
 model User {
@@ -32,52 +38,93 @@ model User {
   phone              String?
   createdAt          DateTime @default(now())
 
-  student         Student?
-  homeroomClasses Classroom[]    @relation("Homeroom")
-  templates       FormTemplate[]
-  feedbacks       Feedback[]
-  notes           Note[]
+  student          Student?
+  homeroomClasses  Classroom[]       @relation("Homeroom")
+  templates        FormTemplate[]
+  feedbacks        Feedback[]
+  notes            Note[]
   emulationRecords EmulationRecord[]
+  auditLogs        AuditLog[]
+  classTransfers   ClassTransfer[]
+  reportDecisions  ScoreReport[]
+}
+
+/// Năm học. Tuần học được đánh số từ startDate (tuần 1 là tuần chứa startDate).
+model SchoolYear {
+  id             String   @id @default(cuid())
+  /// Dạng "2026-2027", là khóa để lớp tham chiếu
+  name           String   @unique
+  startDate      DateTime
+  semester2Start DateTime
+  endDate        DateTime
+  isCurrent      Boolean  @default(false)
+  /// Năm học đã kết thúc: dữ liệu chỉ còn được xem
+  locked         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  classes Classroom[]
 }
 
 model Classroom {
-  id                String   @id @default(cuid())
+  id                String     @id @default(cuid())
   name              String
   schoolYear        String
+  year              SchoolYear @relation(fields: [schoolYear], references: [name], onUpdate: Cascade)
   homeroomTeacherId String?
-  homeroomTeacher   User?    @relation("Homeroom", fields: [homeroomTeacherId], references: [id], onDelete: SetNull)
+  homeroomTeacher   User?      @relation("Homeroom", fields: [homeroomTeacherId], references: [id], onDelete: SetNull)
   /// Số tổ của lớp, dùng cho thi đua
-  groupCount        Int      @default(4)
-  createdAt         DateTime @default(now())
+  groupCount        Int        @default(4)
+  /// Tên tổ do GV đặt: ["Tổ Ong vàng", ...] theo thứ tự tổ 1..groupCount; thiếu thì hiển thị "Tổ n"
+  groupNames        Json?
+  /// Điểm gốc mỗi tuần của mỗi học sinh khi chấm điểm theo tiêu chí
+  baseScore         Int        @default(100)
+  /// Ngưỡng xếp loại tuần: >= ratingGood là Tốt, >= ratingFair là Khá, >= ratingPass là Đạt, còn lại Cần cố gắng
+  ratingGood        Int        @default(100)
+  ratingFair        Int        @default(95)
+  ratingPass        Int        @default(85)
+  createdAt         DateTime   @default(now())
 
   students            Student[]
   surveys             Survey[]
   emulationCategories EmulationCategory[]
   emulationRecords    EmulationRecord[]
+  transfersOut        ClassTransfer[]     @relation("TransferFrom")
+  enrollments         Enrollment[]
+  transfersIn         ClassTransfer[]     @relation("TransferTo")
 
   @@unique([name, schoolYear])
 }
 
 model Student {
-  id          String    @id @default(cuid())
-  userId      String    @unique
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  classId     String
-  classroom   Classroom @relation(fields: [classId], references: [id], onDelete: Cascade)
-  studentCode String?
-  dateOfBirth String?
-  gender      String?
-  address     String?
-  parentName  String?
-  parentPhone String?
+  id              String        @id @default(cuid())
+  userId          String        @unique
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  classId         String
+  classroom       Classroom     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  studentCode     String?
+  dateOfBirth     String?
+  gender          String?
+  address         String?
+  parentName      String?
+  parentPhone     String?
   /// Tổ (1..groupCount), null = chưa phân tổ
-  groupNo     Int?
+  groupNo         Int?
   /// Cán sự lớp: được ghi điểm thi đua
-  isMonitor   Boolean   @default(false)
+  isMonitor       Boolean       @default(false)
+  /// Tổ trưởng: được nhận xét và đề xuất bổ sung vi phạm cho tổ viên (GV xác nhận mới tính)
+  isGroupLeader   Boolean       @default(false)
   /// Mã bí mật trong đường link phụ huynh xem kết quả (/ph/<mã>), không cần đăng nhập
-  parentToken String?   @unique
+  parentToken     String?       @unique
+  status          StudentStatus @default(ACTIVE)
+  statusChangedAt DateTime?
+  /// Ghi chú của giáo viên (học sinh không thấy)
+  note            String?
 
+  transfers        ClassTransfer[]
+  enrollments      Enrollment[]
   responses        Response[]
+  scoreReports     ScoreReport[]     @relation("ReportTarget")
+  reportsMade      ScoreReport[]     @relation("ReportAuthor")
   notes            Note[]
   emulationRecords EmulationRecord[]
 
@@ -111,43 +158,64 @@ model Survey {
   openAt     DateTime
   closeAt    DateTime
   questions  Json
+  /// Bản chụp tiêu chí chấm điểm của lớp lúc tạo đợt: [{ id, name, points }]. null = đợt không chấm điểm
+  criteria   Json?
+  /// Điểm gốc của đợt (chụp từ lớp lúc tạo)
+  baseScore  Int?
   createdAt  DateTime      @default(now())
 
-  responses Response[]
+  responses    Response[]
+  scoreReports ScoreReport[]
 
   @@index([classId, openAt])
 }
 
+enum ResponseStatus {
+  SUBMITTED // Đã nộp, chờ GV duyệt
+  REVISION // GV yêu cầu sửa
+  APPROVED // Đã duyệt: khóa phiếu và công bố kết quả
+}
+
 model Response {
-  id          String    @id @default(cuid())
-  surveyId    String
-  survey      Survey    @relation(fields: [surveyId], references: [id], onDelete: Cascade)
-  studentId   String
-  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  answers     Json
-  score       Float?
-  urgent      Boolean   @default(false)
-  submittedAt DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  feedback    Feedback?
+  id            String         @id @default(cuid())
+  surveyId      String
+  survey        Survey         @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  studentId     String
+  student       Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  answers       Json
+  score         Float?
+  urgent        Boolean        @default(false)
+  submittedAt   DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  feedback      Feedback?
+  status        ResponseStatus @default(SUBMITTED)
+  /// Số lần học sinh tự khai theo từng tiêu chí: { criterionId: số lần }
+  selfCounts    Json?
+  /// Số lần GV chốt (ghi đè) theo tiêu chí; tiêu chí không có ở đây = tự khai + bổ sung đã chấp nhận
+  teacherCounts Json?
+  /// Điểm thi đua tuần, tính lại sau mỗi thay đổi
+  points        Int?
+  /// Lời nhắn khi GV yêu cầu sửa
+  reviewNote    String?
+  reviewedAt    DateTime?
 
   @@unique([surveyId, studentId])
   @@index([studentId])
 }
 
 model Feedback {
-  id          String    @id @default(cuid())
-  responseId  String    @unique
-  response    Response  @relation(fields: [responseId], references: [id], onDelete: Cascade)
-  teacherId   String?
-  teacher     User?     @relation(fields: [teacherId], references: [id], onDelete: SetNull)
-  content     String
-  goals       Json
-  published   Boolean   @default(false)
-  publishedAt DateTime?
+  id               String    @id @default(cuid())
+  responseId       String    @unique
+  response         Response  @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  teacherId        String?
+  teacher          User?     @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  content          String
+  goals            Json
+  published        Boolean   @default(false)
+  publishedAt      DateTime?
   /// Lần cuối giáo viên bấm nhắn/sao chép tin gửi phụ huynh
   parentNotifiedAt DateTime?
-  updatedAt   DateTime  @updatedAt
+  updatedAt        DateTime  @updatedAt
 }
 
 model Note {
@@ -194,4 +262,90 @@ model EmulationRecord {
   createdAt DateTime  @default(now())
 
   @@index([classId, date])
+}
+
+/// Lịch sử chuyển lớp. Phiếu cũ vẫn gắn với đợt của lớp cũ nên không mất.
+model ClassTransfer {
+  id          String     @id @default(cuid())
+  studentId   String
+  student     Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  fromClassId String?
+  fromClass   Classroom? @relation("TransferFrom", fields: [fromClassId], references: [id], onDelete: SetNull)
+  toClassId   String?
+  toClass     Classroom? @relation("TransferTo", fields: [toClassId], references: [id], onDelete: SetNull)
+  reason      String?
+  actorId     String?
+  actor       User?      @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt   DateTime   @default(now())
+
+  @@index([studentId])
+}
+
+/// Nhật ký thao tác quan trọng: chỉ thêm, không sửa/xóa từ giao diện.
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  /// Họ tên người thao tác lúc ghi, giữ lại kể cả khi tài khoản bị xóa
+  actorName String?
+  /// vd: student.create, student.transfer, teacher.lock
+  action    String
+  entity    String?
+  entityId  String?
+  classId   String?
+  summary   String
+  detail    Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([classId, createdAt])
+  @@index([entity, entityId])
+}
+
+enum ReportStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+/// Tổ trưởng bổ sung vi phạm (criterionId có giá trị) hoặc nhận xét (criterionId null) cho tổ viên.
+/// Chỉ được tính điểm / cho học sinh thấy khi GV chấp nhận.
+model ScoreReport {
+  id            String       @id @default(cuid())
+  surveyId      String
+  survey        Survey       @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  studentId     String
+  student       Student      @relation("ReportTarget", fields: [studentId], references: [id], onDelete: Cascade)
+  reporterId    String?
+  reporter      Student?     @relation("ReportAuthor", fields: [reporterId], references: [id], onDelete: SetNull)
+  reporterName  String
+  /// Tiêu chí trong bản chụp của đợt; null = chỉ nhận xét
+  criterionId   String?
+  criterionName String?
+  /// Điểm mỗi lần (chụp lại) và số lần
+  points        Int          @default(0)
+  times         Int          @default(0)
+  note          String?
+  status        ReportStatus @default(PENDING)
+  decidedById   String?
+  decidedBy     User?        @relation(fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt     DateTime?
+  createdAt     DateTime     @default(now())
+
+  @@index([surveyId, studentId])
+}
+
+/// Học sinh học lớp nào trong từng năm học. Mỗi học sinh chỉ thuộc 1 lớp trong 1 năm học;
+/// Student.classId là lớp của lần xếp lớp mới nhất.
+model Enrollment {
+  id         String    @id @default(cuid())
+  studentId  String
+  student    Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classId    String
+  classroom  Classroom @relation(fields: [classId], references: [id], onDelete: Cascade)
+  schoolYear String
+  createdAt  DateTime  @default(now())
+
+  @@unique([studentId, schoolYear])
+  @@index([classId])
 }

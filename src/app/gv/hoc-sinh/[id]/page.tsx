@@ -7,19 +7,23 @@ import { NOTE_TYPE } from "@/lib/notes";
 import { Badge, FlagList, PageHeader, Stat } from "@/components/ui";
 import { LineChartCard } from "@/components/LineChartCard";
 import { SubmitButton } from "@/components/SubmitButton";
-import { AddNoteForm, ProfileForm } from "./StudentForms";
+import { AddNoteForm, ProfileForm, StatusForm, TransferForm } from "./StudentForms";
+import { STUDENT_STATUS } from "@/lib/students";
+import { classLockedMessage } from "@/lib/schoolYear";
 import { deleteNoteAction } from "./actions";
 import { ensureParentTokens, parentLink, siteUrl } from "@/lib/parent";
 import { regenerateParentLinkAction } from "@/lib/parentActions";
 
 export default async function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { student } = await requireStudentAccess(id);
+  const { user, student } = await requireStudentAccess(id);
   const now = new Date();
+  const locked = await classLockedMessage(student.classroom);
 
-  const [surveys, notes] = await Promise.all([
+  const [surveys, notes, transfers, otherClasses] = await Promise.all([
     prisma.survey.findMany({
-      where: { classId: student.classId, openAt: { lte: now } },
+      // Đợt của lớp hiện tại + các đợt ở lớp cũ mà em đã nộp (trước khi chuyển lớp)
+      where: { openAt: { lte: now }, OR: [{ classId: student.classId }, { responses: { some: { studentId: id } } }] },
       orderBy: { openAt: "asc" },
       select: {
         id: true,
@@ -31,6 +35,22 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
       },
     }),
     prisma.note.findMany({ where: { studentId: id }, orderBy: { date: "desc" }, include: { author: { select: { fullName: true } } } }),
+    prisma.classTransfer.findMany({
+      where: { studentId: id },
+      orderBy: { createdAt: "desc" },
+      include: {
+        fromClass: { select: { name: true, schoolYear: true } },
+        toClass: { select: { name: true, schoolYear: true } },
+        actor: { select: { fullName: true } },
+      },
+    }),
+    user.role === "ADMIN"
+      ? prisma.classroom.findMany({
+          where: { id: { not: student.classId }, year: { locked: false } },
+          orderBy: [{ schoolYear: "desc" }, { name: "asc" }],
+          select: { id: true, name: true, schoolYear: true },
+        })
+      : Promise.resolve([]),
   ]);
 
   let previous: (typeof surveys)[number]["responses"][number] | undefined;
@@ -50,7 +70,12 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
     <>
       <PageHeader
         title={student.user.fullName}
-        subtitle={`Lớp ${student.classroom.name} · ${student.user.username}`}
+        subtitle={
+          <span className="inline-flex flex-wrap items-center gap-2">
+            Lớp {student.classroom.name} · {student.user.username}
+            <Badge className={STUDENT_STATUS[student.status].style}>{STUDENT_STATUS[student.status].label}</Badge>
+          </span>
+        }
         back={{ href: `/gv/lop/${student.classId}/hoc-sinh`, label: `Học sinh lớp ${student.classroom.name}` }}
       />
 
@@ -150,10 +175,47 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                 address: student.address ?? "",
                 parentName: student.parentName ?? "",
                 parentPhone: student.parentPhone ?? "",
+                note: student.note ?? "",
               }}
             />
           </div>
         </details>
+
+        {!locked && (
+          <details className="card">
+            <summary className="cursor-pointer font-semibold">Trạng thái học tập</summary>
+            <p className="mb-3 mt-2 text-sm text-slate-500">
+              Học sinh nghỉ học hoặc chuyển trường sẽ bị khóa tài khoản, nhưng hồ sơ và mọi phiếu đánh giá vẫn được lưu lại.
+            </p>
+            <StatusForm studentId={id} status={student.status} />
+          </details>
+        )}
+
+        {(user.role === "ADMIN" || transfers.length > 0) && (
+          <details className="card">
+            <summary className="cursor-pointer font-semibold">Chuyển lớp {transfers.length > 0 && `(${transfers.length} lần)`}</summary>
+            <div className="mt-3 space-y-4">
+              {user.role === "ADMIN" && (
+                <TransferForm
+                  studentId={id}
+                  classes={otherClasses.map((c) => ({ id: c.id, label: `${c.name} (${c.schoolYear})` }))}
+                />
+              )}
+              {transfers.length > 0 && (
+                <ul className="divide-y divide-slate-100 text-sm">
+                  {transfers.map((t) => (
+                    <li key={t.id} className="py-2">
+                      {fmtDate(t.createdAt)}: {t.fromClass ? `${t.fromClass.name} (${t.fromClass.schoolYear})` : "?"} →{" "}
+                      {t.toClass ? `${t.toClass.name} (${t.toClass.schoolYear})` : "?"}
+                      {t.reason && <span className="text-slate-500"> · {t.reason}</span>}
+                      {t.actor && <span className="text-slate-500"> · {t.actor.fullName}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </details>
+        )}
 
         <div className="card">
           <h2 className="mb-1 font-semibold">Link cho phụ huynh</h2>

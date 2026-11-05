@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { rating } from "@/lib/scoring";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { fmtDate, fmtShortDate } from "@/lib/format";
@@ -30,7 +31,7 @@ export default async function ParentPage({ params }: { params: Promise<{ token: 
 
   const [responses, notes] = await Promise.all([
     prisma.response.findMany({
-      where: { studentId: student.id, feedback: { published: true } },
+      where: { studentId: student.id, status: "APPROVED", feedback: { published: true } },
       orderBy: { survey: { openAt: "desc" } },
       take: SHOW_LAST,
       include: {
@@ -54,7 +55,7 @@ export default async function ParentPage({ params }: { params: Promise<{ token: 
     <div className="min-h-screen">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-2xl px-4 py-4">
-          <div className="text-sm font-bold text-teal-800">Sổ chủ nhiệm · Dành cho phụ huynh</div>
+          <div className="text-sm font-bold text-teal-800">Class Master · Dành cho phụ huynh</div>
         </div>
       </header>
       <main className="mx-auto max-w-2xl space-y-6 px-4 py-6">
@@ -88,17 +89,18 @@ export default async function ParentPage({ params }: { params: Promise<{ token: 
                     <span className="ml-2 text-sm text-slate-500">
                       {fmtDate(r.survey.openAt)}
                       {r.score != null ? ` · tự đánh giá ${r.score}%` : ""}
+                      {r.points != null ? ` · điểm thi đua ${r.points} (${rating(r.points, student.classroom).label})` : ""}
                     </span>
                   </summary>
                   <div className="mt-4 space-y-4">
-                    <FeedbackCard
+                    {r.feedback!.content.trim() && <FeedbackCard
                       title="Nhận xét của giáo viên chủ nhiệm"
                       content={r.feedback!.content}
                       goals={goalsOf(r.feedback!.goals)}
                       teacher={r.feedback!.teacher?.fullName}
                       date={r.feedback!.publishedAt}
                       goalTitle="🎯 Mục tiêu tuần tới của con"
-                    />
+                    />}
                     <div>
                       <h3 className="mb-2 text-sm font-semibold text-slate-700">Con tự đánh giá</h3>
                       <ol className="space-y-3">

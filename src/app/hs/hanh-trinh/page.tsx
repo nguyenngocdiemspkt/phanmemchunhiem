@@ -6,6 +6,7 @@ import { NOTE_TYPE } from "@/lib/notes";
 import { Badge, PageHeader } from "@/components/ui";
 import { LineChartCard } from "@/components/LineChartCard";
 import { FeedbackCard, goalsOf } from "@/components/FeedbackCard";
+import { rating } from "@/lib/scoring";
 
 export default async function JourneyPage() {
   const { student } = await requireStudent();
@@ -60,9 +61,17 @@ export default async function JourneyPage() {
               <Link href={`/hs/phieu/${r.survey.id}`} className="font-semibold text-slate-900 hover:text-teal-700">
                 {r.survey.title}
               </Link>
-              {r.score != null && <span className="text-sm text-slate-500">{r.score}%</span>}
+              <span className="flex items-center gap-2 text-sm text-slate-500">
+                {r.score != null && `${r.score}%`}
+                {r.status === "APPROVED" && r.points != null && (
+                  <>
+                    <b className="text-slate-900">{r.points} điểm</b>
+                    <Badge className={rating(r.points, student.classroom).style}>{rating(r.points, student.classroom).label}</Badge>
+                  </>
+                )}
+              </span>
             </div>
-            {r.feedback?.published ? (
+            {r.feedback?.published && r.feedback.content.trim() ? (
               <FeedbackCard
                 content={r.feedback.content}
                 goals={goalsOf(r.feedback.goals)}
@@ -70,7 +79,7 @@ export default async function JourneyPage() {
                 date={r.feedback.publishedAt}
               />
             ) : (
-              <p className="text-sm text-slate-500">Thầy/cô chưa gửi phản hồi cho tuần này.</p>
+              <p className="text-sm text-slate-500">{r.status === "APPROVED" ? "Thầy/cô đã duyệt phiếu tuần này." : "Thầy/cô chưa duyệt phiếu tuần này."}</p>
             )}
           </div>
         ))}

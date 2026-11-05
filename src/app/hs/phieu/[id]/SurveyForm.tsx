@@ -4,17 +4,21 @@ import { useActionState, useTransition } from "react";
 import type { Answers, Question } from "@/lib/questions";
 import { FormMessage } from "@/components/ui";
 import { submitResponseAction } from "./actions";
+import type { Counts, Criterion } from "@/lib/scoring";
+import { CriteriaInput } from "./CriteriaInput";
 
 export function SurveyForm({
   surveyId,
   questions,
   initial,
   readOnly,
+  scoring,
 }: {
   surveyId: string;
   questions: Question[];
   initial: Answers;
   readOnly: boolean;
+  scoring?: { criteria: Criterion[]; baseScore: number; counts: Counts } | null;
 }) {
   const [state, action, pending] = useActionState(submitResponseAction.bind(null, surveyId), null);
   const [, startTransition] = useTransition();
@@ -29,6 +33,7 @@ export function SurveyForm({
       className="space-y-4"
     >
       <fieldset disabled={readOnly || pending} className="space-y-4">
+        {scoring && <CriteriaInput criteria={scoring.criteria} baseScore={scoring.baseScore} initial={scoring.counts} readOnly={readOnly} />}
         {questions.map((q, i) => (
           <div key={q.id} className="card">
             <div className="mb-3 font-medium text-slate-900">

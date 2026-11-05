@@ -1,10 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireStudent } from "@/lib/auth";
 import { surveyStatus } from "@/lib/format";
 import { computeScore, findUrgentKeywords, parseQuestions, type Answers } from "@/lib/questions";
+import { countsFromForm, parseCriteria } from "@/lib/scoring";
+import { recomputePoints } from "@/lib/scoreService";
 
 export type SubmitState = { error?: string } | null;
 
@@ -12,7 +15,15 @@ export async function submitResponseAction(surveyId: string, _prev: SubmitState,
   const { student } = await requireStudent();
   const survey = await prisma.survey.findUnique({ where: { id: surveyId } });
   if (!survey || survey.classId !== student.classId) return { error: "Không tìm thấy phiếu." };
-  if (surveyStatus(survey) !== "open") return { error: "Phiếu đã đóng hoặc chưa mở, em không thể nộp lúc này." };
+  const existing = await prisma.response.findUnique({
+    where: { surveyId_studentId: { surveyId, studentId: student.id } },
+    select: { status: true },
+  });
+  if (existing?.status === "APPROVED") return { error: "Phiếu đã được thầy/cô duyệt nên không sửa được nữa." };
+  // Được nộp khi phiếu đang mở, hoặc khi thầy/cô yêu cầu sửa (kể cả đã hết hạn)
+  if (surveyStatus(survey) !== "open" && existing?.status !== "REVISION") {
+    return { error: "Phiếu đã đóng hoặc chưa mở, em không thể nộp lúc này." };
+  }
 
   const questions = parseQuestions(survey.questions);
   const answers: Answers = {};
@@ -25,13 +36,19 @@ export async function submitResponseAction(surveyId: string, _prev: SubmitState,
     }
     if (q.required && !answers[q.id]) return { error: `Em chưa trả lời câu: "${q.text}"` };
   }
+  const parsed = countsFromForm(parseCriteria(survey.criteria), formData, "c_");
+  if ("error" in parsed) return { error: parsed.error };
+  const selfCounts = parsed.counts;
 
   const score = computeScore(questions, answers);
   const urgent = findUrgentKeywords(questions, answers).length > 0;
-  await prisma.response.upsert({
+  // Nộp lại sau khi sửa: quay về chờ duyệt, bỏ số GV đã chốt để GV xem lại theo bản khai mới
+  const data = { answers, score, urgent, selfCounts, status: "SUBMITTED" as const };
+  const response = await prisma.response.upsert({
     where: { surveyId_studentId: { surveyId, studentId: student.id } },
-    create: { surveyId, studentId: student.id, answers, score, urgent },
-    update: { answers, score, urgent, submittedAt: new Date() },
+    create: { surveyId, studentId: student.id, ...data },
+    update: { ...data, teacherCounts: Prisma.DbNull, submittedAt: new Date() },
   });
+  await recomputePoints(prisma, response.id);
   redirect("/hs?da-nop=1");
 }

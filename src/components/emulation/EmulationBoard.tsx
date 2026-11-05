@@ -15,7 +15,7 @@ function Points({ value, className = "" }: { value: number; className?: string }
 }
 
 function RankTable({ title, subtitle, rows, ownGroup }: { title: string; subtitle: string; rows: GroupStanding[]; ownGroup?: number | null }) {
-  const anyPoints = rows.some((r) => r.plus || r.minus);
+  const anyPoints = rows.some((r) => r.plus || r.minus || r.sheetCount);
   return (
     <div className="card overflow-x-auto">
       <h2 className="font-semibold">{title}</h2>
@@ -25,8 +25,8 @@ function RankTable({ title, subtitle, rows, ownGroup }: { title: string; subtitl
           <tr>
             <th className="w-16">Hạng</th>
             <th>Tổ</th>
-            <th className="text-right">Cộng</th>
-            <th className="text-right">Trừ</th>
+            <th className="text-right" title="Tổng điểm các phiếu tuần đã duyệt của thành viên">Phiếu tuần</th>
+            <th className="text-right" title="Điểm GV/cán sự ghi trực tiếp">Ghi thêm</th>
             <th className="text-right">Tổng</th>
           </tr>
         </thead>
@@ -35,19 +35,24 @@ function RankTable({ title, subtitle, rows, ownGroup }: { title: string; subtitl
             <tr key={r.groupNo} className={r.groupNo === ownGroup ? "bg-teal-50" : ""}>
               <td className="text-lg">{anyPoints && r.rank <= 3 ? MEDAL[r.rank - 1] : <span className="text-sm text-slate-500">{r.rank}</span>}</td>
               <td>
-                <span className="font-medium">Tổ {r.groupNo}</span>
+                <span className="font-medium">{r.name}</span>
                 {r.groupNo === ownGroup && <span className="ml-1 text-xs text-teal-700">(tổ em)</span>}
                 <div className="text-xs text-slate-500">{r.members} học sinh</div>
               </td>
-              <td className="text-right">
-                <Points value={r.plus} />
+              <td className="text-right tabular-nums">
+                {r.sheetCount ? (
+                  <>
+                    <span className="font-semibold">{r.sheets}</span>
+                    <div className="text-xs text-slate-500">{r.sheetCount} phiếu</div>
+                  </>
+                ) : (
+                  <span className="text-slate-400">—</span>
+                )}
               </td>
               <td className="text-right">
-                <Points value={r.minus} />
+                {r.plus || r.minus ? <Points value={r.plus + r.minus} /> : <span className="text-slate-400">—</span>}
               </td>
-              <td className="text-right text-base">
-                <Points value={r.total} />
-              </td>
+              <td className="text-right text-base font-bold tabular-nums">{r.total}</td>
             </tr>
           ))}
         </tbody>
@@ -121,7 +126,7 @@ export function EmulationBoard({
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <RankTable title="Xếp hạng tuần" subtitle="Tổng điểm cộng/trừ trong tuần đang xem" rows={data.weekly} ownGroup={ownGroup} />
+        <RankTable title="Xếp hạng tuần" subtitle="Tổng điểm phiếu tuần đã duyệt của các thành viên + điểm ghi thêm trong tuần đang xem" rows={data.weekly} ownGroup={ownGroup} />
         <RankTable title="Xếp hạng cả năm" subtitle="Cộng dồn tất cả các tuần" rows={data.overall} ownGroup={ownGroup} />
       </div>
 
@@ -203,7 +208,7 @@ export function EmulationBoard({
           data={data.hasChartData ? data.chart : []}
           series={Array.from({ length: groupCount }, (_, i) => ({
             key: `g${i + 1}`,
-            name: `Tổ ${i + 1}`,
+            name: data.groupNames[i] ?? `Tổ ${i + 1}`,
             color: GROUP_COLORS[i % GROUP_COLORS.length],
           }))}
           domain={["auto", "auto"]}

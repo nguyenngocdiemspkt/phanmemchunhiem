@@ -7,8 +7,11 @@ const NAV: Record<Role, { href: string; label: string }[]> = {
   ADMIN: [
     { href: "/admin", label: "Tổng quan" },
     { href: "/admin/giao-vien", label: "Giáo viên" },
+    { href: "/admin/nam-hoc", label: "Năm học" },
     { href: "/admin/lop", label: "Lớp học" },
+    { href: "/admin/xep-lop", label: "Xếp lớp" },
     { href: "/gv/mau-phieu", label: "Mẫu phiếu" },
+    { href: "/admin/nhat-ky", label: "Nhật ký" },
   ],
   TEACHER: [
     { href: "/gv", label: "Lớp chủ nhiệm" },
@@ -36,7 +39,7 @@ export function AppShell({
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <Link href="/" className="text-lg font-bold text-teal-800">
-            Sổ chủ nhiệm
+            Class Master
           </Link>
           <NavLinks items={NAV[user.role]} />
           <div className="ml-auto flex items-center gap-3 text-sm">

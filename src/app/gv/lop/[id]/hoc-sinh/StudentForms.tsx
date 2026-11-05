@@ -26,6 +26,20 @@ function ImportResult({ state, className }: { state: ImportState; className: str
           ))}
         </ul>
       )}
+      {state.enrolled && state.enrolled.length > 0 && (
+        <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+          <p className="mb-1 font-medium">
+            Đã xếp {state.enrolled.length} học sinh từ năm học trước vào lớp (dùng lại tài khoản và mật khẩu cũ):
+          </p>
+          <ul className="list-inside list-disc">
+            {state.enrolled.map((c) => (
+              <li key={c.username}>
+                {c.fullName} ({c.username}), trước học lớp {c.from}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {state.created && state.created.length > 0 && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -95,7 +109,7 @@ export function ImportStudentsForm({ classId, className }: { classId: string; cl
   );
 }
 
-export function AddStudentForm({ classId, className }: { classId: string; className: string }) {
+export function AddStudentForm({ classId, className, groupCount }: { classId: string; className: string; groupCount: number }) {
   const [state, action, pending] = useActionState(addStudentAction.bind(null, classId), null);
   return (
     <div>
@@ -127,6 +141,25 @@ export function AddStudentForm({ classId, className }: { classId: string; classN
         <div>
           <label className="label">SĐT phụ huynh</label>
           <input name="parentPhone" className="input" />
+        </div>
+        <div>
+          <label className="label">Tổ</label>
+          <select name="groupNo" className="input" defaultValue="">
+            <option value="">Chưa phân tổ</option>
+            {Array.from({ length: groupCount }, (_, i) => (
+              <option key={i} value={i + 1}>
+                Tổ {i + 1}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="sm:col-span-2">
+          <label className="label">Địa chỉ</label>
+          <input name="address" className="input" />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="label">Ghi chú (học sinh không thấy)</label>
+          <input name="note" className="input" />
         </div>
         <div>
           <label className="label">Tên đăng nhập (bỏ trống để tự tạo)</label>

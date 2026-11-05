@@ -9,6 +9,7 @@ export function ClassTabs({ classId }: { classId: string }) {
   const items = [
     { href: base, label: "Tổng quan" },
     { href: `${base}/hoc-sinh`, label: "Học sinh" },
+    { href: `${base}/to`, label: "Tổ" },
     { href: `${base}/dot`, label: "Đợt tự đánh giá" },
     { href: `${base}/thi-dua`, label: "Thi đua tổ" },
   ];

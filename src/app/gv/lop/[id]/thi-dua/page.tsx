@@ -13,7 +13,7 @@ export default async function ClassEmulationPage({
   const { id } = await params;
   const { user, classroom, level } = await requireEmulationAccess(id);
   const week = weekRange((await searchParams).tuan);
-  const data = await loadEmulationBoard(id, classroom.groupCount, week);
+  const data = await loadEmulationBoard(id, classroom.groupCount, week, classroom.groupNames);
   const monitors = data.students.filter((s) => s.isMonitor);
 
   return (
