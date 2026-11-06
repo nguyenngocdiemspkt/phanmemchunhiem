@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { audit } from "@/lib/audit";
-import { enrollStudent } from "@/lib/students";
+import { enrollManyOps } from "@/lib/students";
 
 export type PromoteState = { error?: string; ok?: string; skipped?: string[] } | null;
 
@@ -31,19 +31,18 @@ export async function promoteStudentsAction(_prev: PromoteState, formData: FormD
   });
   const moved: string[] = [];
   const skipped: string[] = [];
+  const toMove: string[] = [];
   for (const s of students) {
     const current = s.enrollments[0];
     if (current) {
       if (current.classId !== target.id) skipped.push(`${s.user.fullName}: đã thuộc lớp ${current.classroom.name} năm học ${target.schoolYear}`);
       continue;
     }
-    await prisma.$transaction(async (tx) => {
-      await enrollStudent(tx, s.id, target);
-      await tx.classTransfer.create({
-        data: { studentId: s.id, fromClassId: source.id, toClassId: target.id, reason: "Xếp lớp năm học mới", actorId: user.id },
-      });
-    });
+    toMove.push(s.id);
     moved.push(s.user.fullName);
+  }
+  if (toMove.length) {
+    await prisma.$transaction(enrollManyOps(target, toMove, { fromClassId: source.id, reason: "Xếp lớp năm học mới", actorId: user.id }));
   }
   if (moved.length) {
     const summary = `Xếp ${moved.length} học sinh lớp ${source.name} (${source.schoolYear}) vào lớp ${target.name} (${target.schoolYear})`;

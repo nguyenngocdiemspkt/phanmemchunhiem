@@ -85,3 +85,27 @@ export async function enrolledClassIn(studentId: string, schoolYear: string) {
   });
   return e?.classroom ?? null;
 }
+
+/**
+ * Xếp cả nhóm học sinh (chưa có lớp trong năm học của lớp đích) vào lớp, trong một lô lệnh:
+ * thêm dòng xếp lớp, đổi lớp hiện tại (chỉ khi lớp đích không cũ hơn lớp hiện tại), ghi lịch sử chuyển lớp.
+ */
+export function enrollManyOps(
+  classroom: { id: string; schoolYear: string },
+  studentIds: string[],
+  transfer: { fromClassId: string | null; reason: string; actorId: string },
+) {
+  return [
+    prisma.enrollment.createMany({
+      data: studentIds.map((studentId) => ({ studentId, classId: classroom.id, schoolYear: classroom.schoolYear })),
+      skipDuplicates: true,
+    }),
+    prisma.student.updateMany({
+      where: { id: { in: studentIds }, classroom: { schoolYear: { lte: classroom.schoolYear } } },
+      data: { classId: classroom.id, groupNo: null, isMonitor: false, isGroupLeader: false },
+    }),
+    prisma.classTransfer.createMany({
+      data: studentIds.map((studentId) => ({ studentId, toClassId: classroom.id, ...transfer })),
+    }),
+  ];
+}
