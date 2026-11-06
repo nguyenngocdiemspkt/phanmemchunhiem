@@ -64,7 +64,8 @@ export default async function ClassStudentsPage({
             <h2 className="mb-1 font-semibold">Nhập danh sách từ Excel</h2>
             <p className="mb-3 text-sm text-slate-500">
               File .xlsx có cột <b>Họ và tên</b> (bắt buộc); các cột tùy chọn: Mã học sinh, Ngày sinh, Giới tính, Tổ, Họ tên phụ huynh, SĐT
-              phụ huynh, Địa chỉ, Ghi chú, Tên đăng nhập, Mật khẩu. Mã học sinh không được trùng trong cùng năm học.
+              phụ huynh, Địa chỉ, Ghi chú, Tên đăng nhập, Mật khẩu. Nhập lại file có mã học sinh đã có trong lớp sẽ cập nhật thông tin của em đó
+              (giữ nguyên tài khoản, mật khẩu); mã đang thuộc lớp khác cùng năm học sẽ bị bỏ qua.
             </p>
             <ImportStudentsForm classId={id} className={classroom.name} />
           </div>

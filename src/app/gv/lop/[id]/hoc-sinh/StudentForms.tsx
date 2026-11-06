@@ -26,6 +26,20 @@ function ImportResult({ state, className }: { state: ImportState; className: str
           ))}
         </ul>
       )}
+      {state.updated && state.updated.length > 0 && (
+        <details className="rounded-lg border border-teal-200 bg-teal-50 p-3 text-sm text-teal-900" open={state.updated.length <= 10}>
+          <summary className="cursor-pointer font-medium">
+            Đã cập nhật thông tin {state.updated.length} học sinh đã có trong lớp (giữ nguyên tài khoản và mật khẩu)
+          </summary>
+          <ul className="mt-2 list-inside list-disc">
+            {state.updated.map((c) => (
+              <li key={c.username}>
+                {c.fullName} ({c.username}): {c.changes.join("; ")}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       {state.enrolled && state.enrolled.length > 0 && (
         <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
           <p className="mb-1 font-medium">

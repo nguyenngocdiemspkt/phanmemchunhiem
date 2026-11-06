@@ -12,7 +12,25 @@ import { removeDiacritics } from "@/lib/format";
 export type CreatedAccount = { fullName: string; username: string; password: string };
 /** Học sinh từ năm học trước được xếp vào lớp (dùng lại tài khoản cũ) */
 export type EnrolledAccount = { fullName: string; username: string; from: string };
-export type ImportState = { created?: CreatedAccount[]; enrolled?: EnrolledAccount[]; errors?: string[]; error?: string } | null;
+/** Học sinh đã có trong lớp, được cập nhật thông tin theo file (giữ nguyên tài khoản, mật khẩu) */
+export type UpdatedAccount = { fullName: string; username: string; changes: string[] };
+export type ImportState = {
+  created?: CreatedAccount[];
+  enrolled?: EnrolledAccount[];
+  updated?: UpdatedAccount[];
+  errors?: string[];
+  error?: string;
+} | null;
+
+// Cột trong file -> trường hồ sơ, dùng khi cập nhật học sinh đã có trong lớp
+const UPDATE_FIELDS = [
+  ["dateOfBirth", "ngày sinh"],
+  ["gender", "giới tính"],
+  ["parentName", "phụ huynh"],
+  ["parentPhone", "SĐT phụ huynh"],
+  ["address", "địa chỉ"],
+  ["note", "ghi chú"],
+] as const;
 
 const MAX_ROWS = 300;
 const USERNAME_RE = /^[a-z0-9._-]{3,40}$/;
@@ -52,28 +70,44 @@ async function createStudents(
       })
     ).map((u) => u.username),
   );
-  // Mỗi học sinh chỉ thuộc 1 lớp trong 1 năm học: mã đã có lớp trong năm học này thì bỏ qua,
-  // mã của học sinh từ năm học khác thì xếp chính em đó vào lớp (dùng lại tài khoản cũ).
+  // Mỗi học sinh chỉ thuộc 1 lớp trong 1 năm học:
+  // - mã đã có trong chính lớp này: cập nhật thông tin theo file (giữ tài khoản, mật khẩu, phiếu)
+  // - mã đang ở lớp khác cùng năm học: bỏ qua
+  // - mã của học sinh từ năm học khác: xếp chính em đó vào lớp (dùng lại tài khoản cũ)
   const codes = rows.map((r) => r.studentCode).filter((x): x is string => !!x);
   const known = await prisma.student.findMany({
     where: { studentCode: { in: codes, mode: "insensitive" } },
     select: {
       id: true,
+      classId: true,
       studentCode: true,
+      dateOfBirth: true,
+      gender: true,
+      parentName: true,
+      parentPhone: true,
+      address: true,
+      note: true,
+      groupNo: true,
+      userId: true,
       user: { select: { fullName: true, username: true } },
       classroom: { select: { name: true, schoolYear: true } },
-      enrollments: { where: { schoolYear: classroom.schoolYear }, select: { classroom: { select: { name: true } } } },
+      enrollments: { where: { schoolYear: classroom.schoolYear }, select: { classroom: { select: { id: true, name: true } } } },
     },
   });
   const existingCodes = new Map<string, string>();
+  const inThisClass = new Map<string, (typeof known)[number]>();
   const returning = new Map<string, (typeof known)[number]>();
   for (const k of known) {
     const code = k.studentCode!.toLowerCase();
-    const sameYear = k.enrollments[0]?.classroom.name ?? (k.classroom.schoolYear === classroom.schoolYear ? k.classroom.name : null);
-    if (sameYear) existingCodes.set(code, sameYear);
+    const sameYear =
+      k.enrollments[0]?.classroom ?? (k.classroom.schoolYear === classroom.schoolYear ? { id: k.classId, name: k.classroom.name } : null);
+    if (sameYear?.id === classId) inThisClass.set(code, k);
+    else if (sameYear) existingCodes.set(code, sameYear.name);
     else returning.set(code, k);
   }
   const enrolled: EnrolledAccount[] = [];
+  const updated: UpdatedAccount[] = [];
+  const seenInFile = new Set<string>();
 
   async function uniqueUsername(base: string) {
     for (let i = 1; i < 1000; i++) {
@@ -91,6 +125,47 @@ async function createStudents(
 
   const prepared: { row: StudentRow; username: string; password: string }[] = [];
   for (const row of rows) {
+    if (row.studentCode) {
+      const code = row.studentCode.toLowerCase();
+      if (seenInFile.has(code)) {
+        errors.push(`Dòng ${row.row}: mã học sinh ${row.studentCode} bị lặp lại trong file, bỏ qua.`);
+        continue;
+      }
+      seenInFile.add(code);
+    }
+    const current = row.studentCode && inThisClass.get(row.studentCode.toLowerCase());
+    if (current) {
+      // Chỉ ghi đè các ô có dữ liệu trong file; không đổi tên đăng nhập, mật khẩu
+      const data: Record<string, string> = {};
+      const changes: string[] = [];
+      if (row.fullName !== current.user.fullName) changes.push(`họ tên: ${current.user.fullName} → ${row.fullName}`);
+      for (const [field, label] of UPDATE_FIELDS) {
+        const value = row[field];
+        if (value && value !== current[field]) {
+          data[field] = value;
+          changes.push(`${label}: ${current[field] ?? "(trống)"} → ${value}`);
+        }
+      }
+      const groupNo = toGroup(row.groupNo);
+      if (groupNo && groupNo !== current.groupNo) changes.push(`tổ: ${current.groupNo ?? "(chưa có)"} → ${groupNo}`);
+      if (changes.length) {
+        await prisma.user.update({
+          where: { id: current.userId },
+          data: {
+            fullName: row.fullName,
+            student: {
+              update: {
+                ...data,
+                // Đổi tổ thì thôi làm tổ trưởng tổ cũ
+                ...(groupNo && groupNo !== current.groupNo ? { groupNo, isGroupLeader: false } : {}),
+              },
+            },
+          },
+        });
+        updated.push({ fullName: row.fullName, username: current.user.username, changes });
+      }
+      continue;
+    }
     const takenBy = row.studentCode && existingCodes.get(row.studentCode.toLowerCase());
     if (takenBy) {
       errors.push(`Dòng ${row.row}: mã học sinh ${row.studentCode} đã có ở lớp ${takenBy} năm học ${classroom.schoolYear}, bỏ qua.`);
@@ -161,6 +236,7 @@ async function createStudents(
   return {
     created: prepared.map((p) => ({ fullName: p.row.fullName, username: p.username, password: p.password })),
     enrolled,
+    updated,
     errors,
   };
 }
@@ -183,10 +259,11 @@ export async function importStudentsAction(classId: string, _prev: ImportState, 
     entity: "Classroom",
     entityId: classId,
     classId,
-    summary: `Nhập ${result.created.length} học sinh mới${result.enrolled.length ? `, xếp lại ${result.enrolled.length} học sinh từ năm trước` : ""} vào lớp ${classroom.name} từ file "${file.name}"${result.errors.length ? `, bỏ qua ${result.errors.length} dòng` : ""}`,
+    summary: `Nhập ${result.created.length} học sinh mới${result.enrolled.length ? `, xếp lại ${result.enrolled.length} học sinh từ năm trước` : ""}${result.updated.length ? `, cập nhật thông tin ${result.updated.length} học sinh đã có` : ""} vào lớp ${classroom.name} từ file "${file.name}"${result.errors.length ? `, bỏ qua ${result.errors.length} dòng` : ""}`,
     detail: {
       created: result.created.map((c) => `${c.fullName} (${c.username})`),
       enrolled: result.enrolled.map((c) => `${c.fullName} (${c.username}) từ ${c.from}`),
+      updated: result.updated.map((c) => `${c.fullName} (${c.username}): ${c.changes.join("; ")}`),
       errors: result.errors,
     },
   });
