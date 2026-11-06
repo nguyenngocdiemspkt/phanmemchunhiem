@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { fmtDate, fromDateInput } from "@/lib/format";
 import { firstYearOf, validateYearDates } from "@/lib/schoolYear";
-import { enrollStudent } from "@/lib/students";
+import { enrollManyOps } from "@/lib/students";
 
 export type YearFormState = { error?: string; ok?: string } | null;
 
@@ -153,13 +153,11 @@ export async function copyClassesAction(yearId: string, _prev: CopyClassesState,
         where: { status: "ACTIVE", enrollments: { some: { classId: c.id }, none: { schoolYear: target.name } } },
         select: { id: true },
       });
-      for (const s of students) {
-        await prisma.$transaction(async (tx) => {
-          await enrollStudent(tx, s.id, classroom);
-          await tx.classTransfer.create({
-            data: { studentId: s.id, fromClassId: c.id, toClassId: classroom.id, reason: "Lên lớp năm học mới", actorId: user.id },
-          });
-        });
+      // Cả lớp trong một lô lệnh (nhanh, không vượt thời gian khi lớp đông)
+      if (students.length) {
+        await prisma.$transaction(
+          enrollManyOps(classroom, students.map((s) => s.id), { fromClassId: c.id, reason: "Lên lớp năm học mới", actorId: user.id }),
+        );
       }
       moved += students.length;
     }

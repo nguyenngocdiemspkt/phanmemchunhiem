@@ -4,6 +4,8 @@ import { byVietnameseName, STUDENT_STATUS } from "@/lib/students";
 import { Empty, PageHeader } from "@/components/ui";
 import { PromoteForm } from "./PromoteForm";
 
+export const maxDuration = 60;
+
 export default async function PromotePage({ searchParams }: { searchParams: Promise<{ tu?: string }> }) {
   await requireUser(["ADMIN"]);
   const { tu } = await searchParams;

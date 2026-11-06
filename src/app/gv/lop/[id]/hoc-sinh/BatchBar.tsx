@@ -30,12 +30,29 @@ export function BatchBar({ classId, groupCount }: { classId: string; groupCount:
           <option value="status:TRANSFERRED">Chuyển trường (khóa tài khoản)</option>
           <option value="status:LEFT">Nghỉ học (khóa tài khoản)</option>
         </optgroup>
+        <optgroup label="Xóa">
+          <option value="delete">Xóa hẳn học sinh đã chọn</option>
+        </optgroup>
       </select>
       <button
         className="btn-primary btn-sm"
         disabled={pending}
         onClick={(e) => {
-          const op = (e.currentTarget.form?.elements.namedItem("op") as HTMLSelectElement | null)?.value ?? "";
+          const form = e.currentTarget.form;
+          const op = (form?.elements.namedItem("op") as HTMLSelectElement | null)?.value ?? "";
+          const count = document.querySelectorAll(`input[type=checkbox][name=ids][form=${BATCH_FORM_ID}]:checked`).length;
+          if (
+            op === "delete" &&
+            !confirm(
+              `Xóa vĩnh viễn ${count} học sinh đã chọn?
+
+Tài khoản, phiếu đã nộp, nhận xét, ghi chú của các em sẽ bị xóa khỏi hệ thống (bản chụp được lưu trong Nhật ký thao tác).
+Nếu học sinh nghỉ học hoặc chuyển trường, hãy dùng trạng thái thay vì xóa.`,
+            )
+          ) {
+            e.preventDefault();
+            return;
+          }
           if (op.startsWith("status:") && op !== "status:ACTIVE" && !confirm("Học sinh sẽ không đăng nhập được nữa. Hồ sơ và phiếu cũ vẫn được giữ. Tiếp tục?")) {
             e.preventDefault();
           }

@@ -8,6 +8,9 @@ import { CreateYearForm } from "./CreateYearForm";
 import { CopyClassesForm } from "./CopyClassesForm";
 import { deleteYearAction, setCurrentYearAction, toggleYearLockAction, updateYearAction } from "./actions";
 
+// Tạo lớp năm mới kèm chuyển học sinh của cả trường cần thêm thời gian xử lý
+export const maxDuration = 60;
+
 export default async function SchoolYearsPage() {
   await requireUser(["ADMIN"]);
   const years = await prisma.schoolYear.findMany({

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { hashPassword, randomPassword, requireClassAccess } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { classLockedMessage } from "@/lib/schoolYear";
-import { applyStudentStatus, enrollStudent, parseStatus, STUDENT_STATUS } from "@/lib/students";
+import { enrollStudent, parseStatus, STUDENT_STATUS } from "@/lib/students";
 import { parseStudentWorkbook, type StudentRow } from "@/lib/excel";
 import { removeDiacritics } from "@/lib/format";
 
@@ -206,9 +206,11 @@ async function createStudents(
   // bcrypt cost 8 để nhập vài trăm học sinh không vượt thời gian chạy của Vercel;
   // học sinh bắt buộc đổi mật khẩu (cost 10) ở lần đăng nhập đầu.
   const hashes = await Promise.all(prepared.map((p) => hashPassword(p.password, 8)));
-  await prisma.$transaction(async (tx) => {
-    for (const [i, p] of prepared.entries()) {
-      await tx.user.create({
+  // Giao dịch dạng lô (gửi một lần), không dùng giao dịch tương tác: tạo từng em trong giao dịch
+  // tương tác sẽ vượt giới hạn thời gian khi cơ sở dữ liệu ở xa (Neon) và lớp đông.
+  await prisma.$transaction(
+    prepared.map((p, i) =>
+      prisma.user.create({
         data: {
           username: p.username,
           fullName: p.row.fullName,
@@ -230,9 +232,9 @@ async function createStudents(
             },
           },
         },
-      });
-    }
-  });
+      }),
+    ),
+  );
   return {
     created: prepared.map((p) => ({ fullName: p.row.fullName, username: p.username, password: p.password })),
     enrolled,
@@ -345,10 +347,43 @@ export async function batchStudentsAction(classId: string, _prev: BatchState, fo
   } else if (op.startsWith("status:")) {
     const status = parseStatus(op.slice(7));
     if (!status) return { error: "Trạng thái không hợp lệ." };
-    await prisma.$transaction(async (tx) => {
-      for (const s of students) await applyStudentStatus(tx, s.id, status);
-    });
+    const ids = students.map((s) => s.id);
+    // Cả nhóm trong 2 lệnh; học sinh không còn "Đang học" thì khóa đăng nhập
+    await prisma.$transaction([
+      prisma.student.updateMany({ where: { id: { in: ids } }, data: { status, statusChangedAt: new Date() } }),
+      prisma.user.updateMany({ where: { student: { id: { in: ids } } }, data: { active: status === "ACTIVE" } }),
+    ]);
     summary = `Đổi trạng thái ${students.length} học sinh thành "${STUDENT_STATUS[status].label}"`;
+  } else if (op === "delete") {
+    // Xóa hẳn nhiều học sinh: chụp toàn bộ hồ sơ, phiếu, nhận xét vào nhật ký rồi xóa trong một lệnh
+    const full = await prisma.user.findMany({
+      where: { student: { id: { in: students.map((s) => s.id) } } },
+      include: {
+        student: {
+          include: {
+            responses: { include: { feedback: true, survey: { select: { title: true } } } },
+            notes: true,
+            transfers: true,
+            enrollments: true,
+          },
+        },
+      },
+    });
+    await prisma.auditLog.createMany({
+      data: full.map(({ passwordHash: _omit, ...u }) => ({
+        actorId: user.id,
+        actorName: user.fullName,
+        action: "student.delete",
+        entity: "Student",
+        entityId: u.student!.id,
+        classId,
+        summary: `Xóa vĩnh viễn học sinh ${u.fullName} (${u.username}), lớp ${classroom.name}, ${u.student!.responses.length} phiếu`,
+        detail: JSON.parse(JSON.stringify(u)),
+      })),
+    });
+    await prisma.user.deleteMany({ where: { id: { in: full.map((u) => u.id) }, role: "STUDENT" } });
+    revalidatePath("/", "layout");
+    return { ok: `Đã xóa hẳn ${full.length} học sinh. Bản chụp dữ liệu được lưu trong Nhật ký thao tác.` };
   } else {
     return { error: "Hãy chọn thao tác." };
   }
