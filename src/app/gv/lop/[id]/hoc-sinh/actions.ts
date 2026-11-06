@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { randomUUID } from "crypto";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { hashPassword, randomPassword, requireClassAccess } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { classLockedMessage } from "@/lib/schoolYear";
-import { enrollStudent, parseStatus, STUDENT_STATUS } from "@/lib/students";
+import { parseStatus, STUDENT_STATUS } from "@/lib/students";
 import { parseStudentWorkbook, type StudentRow } from "@/lib/excel";
 import { removeDiacritics } from "@/lib/format";
 
@@ -47,9 +49,15 @@ function suggestUsername(fullName: string, className: string) {
   return [given, initials, slug(className)].filter(Boolean).join(".");
 }
 
+/**
+ * Tạo/cập nhật/xếp lớp học sinh từ các dòng của file. Số lệnh gửi tới cơ sở dữ liệu cố định
+ * (2 lệnh đọc + 1 giao dịch lô vài lệnh) dù lớp đông bao nhiêu: trên Vercel, mỗi lượt đi về
+ * Neon có thể mất hàng trăm ms nên không được gọi cơ sở dữ liệu theo từng em.
+ */
 async function createStudents(
   classroom: { id: string; name: string; schoolYear: string; groupCount: number },
   rows: StudentRow[],
+  actorId: string,
 ) {
   const { id: classId, name: className, groupCount } = classroom;
   const errors: string[] = [];
@@ -58,42 +66,45 @@ async function createStudents(
     const n = Number(v?.match(/\d+/)?.[0]);
     return Number.isInteger(n) && n >= 1 && n <= groupCount ? n : null;
   };
-  const taken = new Set(
-    (
-      await prisma.user.findMany({
-        where: {
-          username: {
-            in: rows.flatMap((r) => [r.username?.toLowerCase(), r.studentCode?.toLowerCase()]).filter((x): x is string => !!x),
-          },
-        },
-        select: { username: true },
-      })
-    ).map((u) => u.username),
-  );
+  const baseUsername = (row: StudentRow) => {
+    const fromCode = row.studentCode ? row.studentCode.toLowerCase().replace(/[^a-z0-9._-]/g, "") : "";
+    return USERNAME_RE.test(fromCode) ? fromCode : suggestUsername(row.fullName, className);
+  };
+
   // Mỗi học sinh chỉ thuộc 1 lớp trong 1 năm học:
   // - mã đã có trong chính lớp này: cập nhật thông tin theo file (giữ tài khoản, mật khẩu, phiếu)
   // - mã đang ở lớp khác cùng năm học: bỏ qua
   // - mã của học sinh từ năm học khác: xếp chính em đó vào lớp (dùng lại tài khoản cũ)
   const codes = rows.map((r) => r.studentCode).filter((x): x is string => !!x);
-  const known = await prisma.student.findMany({
-    where: { studentCode: { in: codes, mode: "insensitive" } },
-    select: {
-      id: true,
-      classId: true,
-      studentCode: true,
-      dateOfBirth: true,
-      gender: true,
-      parentName: true,
-      parentPhone: true,
-      address: true,
-      note: true,
-      groupNo: true,
-      userId: true,
-      user: { select: { fullName: true, username: true } },
-      classroom: { select: { name: true, schoolYear: true } },
-      enrollments: { where: { schoolYear: classroom.schoolYear }, select: { classroom: { select: { id: true, name: true } } } },
-    },
-  });
+  const explicit = rows.map((r) => r.username?.toLowerCase()).filter((x): x is string => !!x);
+  const bases = [...new Set(rows.map(baseUsername))];
+  const [known, existingUsers] = await Promise.all([
+    prisma.student.findMany({
+      where: { studentCode: { in: codes, mode: "insensitive" } },
+      select: {
+        id: true,
+        classId: true,
+        studentCode: true,
+        dateOfBirth: true,
+        gender: true,
+        parentName: true,
+        parentPhone: true,
+        address: true,
+        note: true,
+        groupNo: true,
+        userId: true,
+        user: { select: { fullName: true, username: true } },
+        classroom: { select: { name: true, schoolYear: true } },
+        enrollments: { where: { schoolYear: classroom.schoolYear }, select: { classroom: { select: { id: true, name: true } } } },
+      },
+    }),
+    // Mọi tên đăng nhập có thể trùng (tên tự đặt, tên gốc và các biến thể có số phía sau) trong một truy vấn
+    prisma.user.findMany({
+      where: { OR: [{ username: { in: explicit } }, ...bases.map((b) => ({ username: { startsWith: b } }))] },
+      select: { username: true },
+    }),
+  ]);
+  const taken = new Set(existingUsers.map((u) => u.username));
   const existingCodes = new Map<string, string>();
   const inThisClass = new Map<string, (typeof known)[number]>();
   const returning = new Map<string, (typeof known)[number]>();
@@ -105,25 +116,42 @@ async function createStudents(
     else if (sameYear) existingCodes.set(code, sameYear.name);
     else returning.set(code, k);
   }
-  const enrolled: EnrolledAccount[] = [];
-  const updated: UpdatedAccount[] = [];
-  const seenInFile = new Set<string>();
 
-  async function uniqueUsername(base: string) {
+  function uniqueUsername(base: string) {
     for (let i = 1; i < 1000; i++) {
       const candidate = i === 1 ? base : `${base}${i}`;
-      if (taken.has(candidate)) continue;
-      if (await prisma.user.findUnique({ where: { username: candidate }, select: { id: true } })) {
+      if (!taken.has(candidate)) {
         taken.add(candidate);
-        continue;
+        return candidate;
       }
-      taken.add(candidate);
-      return candidate;
     }
     throw new Error("Không tạo được tên đăng nhập");
   }
 
+  const enrolled: EnrolledAccount[] = [];
+  const updated: UpdatedAccount[] = [];
+  const seenInFile = new Set<string>();
+  // Cập nhật hồ sơ: null = giữ nguyên giá trị cũ
+  type ProfilePatch = { studentId: string; userId: string; fullName: string | null; groupNo: number | null } & Record<
+    (typeof UPDATE_FIELDS)[number][0],
+    string | null
+  >;
+  const emptyPatch = (studentId: string, userId: string): ProfilePatch => ({
+    studentId,
+    userId,
+    fullName: null,
+    groupNo: null,
+    dateOfBirth: null,
+    gender: null,
+    parentName: null,
+    parentPhone: null,
+    address: null,
+    note: null,
+  });
+  const patches: ProfilePatch[] = [];
+  const returningRows: { student: (typeof known)[number]; groupNo: number | null }[] = [];
   const prepared: { row: StudentRow; username: string; password: string }[] = [];
+
   for (const row of rows) {
     if (row.studentCode) {
       const code = row.studentCode.toLowerCase();
@@ -136,32 +164,26 @@ async function createStudents(
     const current = row.studentCode && inThisClass.get(row.studentCode.toLowerCase());
     if (current) {
       // Chỉ ghi đè các ô có dữ liệu trong file; không đổi tên đăng nhập, mật khẩu
-      const data: Record<string, string> = {};
+      const patch = emptyPatch(current.id, current.userId);
       const changes: string[] = [];
-      if (row.fullName !== current.user.fullName) changes.push(`họ tên: ${current.user.fullName} → ${row.fullName}`);
+      if (row.fullName !== current.user.fullName) {
+        patch.fullName = row.fullName;
+        changes.push(`họ tên: ${current.user.fullName} → ${row.fullName}`);
+      }
       for (const [field, label] of UPDATE_FIELDS) {
         const value = row[field];
         if (value && value !== current[field]) {
-          data[field] = value;
+          patch[field] = value;
           changes.push(`${label}: ${current[field] ?? "(trống)"} → ${value}`);
         }
       }
       const groupNo = toGroup(row.groupNo);
-      if (groupNo && groupNo !== current.groupNo) changes.push(`tổ: ${current.groupNo ?? "(chưa có)"} → ${groupNo}`);
+      if (groupNo && groupNo !== current.groupNo) {
+        patch.groupNo = groupNo;
+        changes.push(`tổ: ${current.groupNo ?? "(chưa có)"} → ${groupNo}`);
+      }
       if (changes.length) {
-        await prisma.user.update({
-          where: { id: current.userId },
-          data: {
-            fullName: row.fullName,
-            student: {
-              update: {
-                ...data,
-                // Đổi tổ thì thôi làm tổ trưởng tổ cũ
-                ...(groupNo && groupNo !== current.groupNo ? { groupNo, isGroupLeader: false } : {}),
-              },
-            },
-          },
-        });
+        patches.push(patch);
         updated.push({ fullName: row.fullName, username: current.user.username, changes });
       }
       continue;
@@ -173,12 +195,7 @@ async function createStudents(
     }
     const old = row.studentCode && returning.get(row.studentCode.toLowerCase());
     if (old) {
-      await prisma.$transaction(async (tx) => {
-        await enrollStudent(tx, old.id, classroom);
-        const groupNo = toGroup(row.groupNo);
-        if (groupNo) await tx.student.update({ where: { id: old.id }, data: { groupNo } });
-      });
-      existingCodes.set(row.studentCode!.toLowerCase(), className);
+      returningRows.push({ student: old, groupNo: toGroup(row.groupNo) });
       enrolled.push({ fullName: old.user.fullName, username: old.user.username, from: `${old.classroom.name} (${old.classroom.schoolYear})` });
       continue;
     }
@@ -195,30 +212,41 @@ async function createStudents(
       }
       taken.add(username);
     } else {
-      const fromCode = row.studentCode ? row.studentCode.toLowerCase().replace(/[^a-z0-9._-]/g, "") : "";
-      username = await uniqueUsername(USERNAME_RE.test(fromCode) ? fromCode : suggestUsername(row.fullName, className));
+      username = uniqueUsername(baseUsername(row));
     }
     const password = row.password && row.password.length >= 6 ? row.password : randomPassword();
-    if (row.studentCode) existingCodes.set(row.studentCode.toLowerCase(), className);
     prepared.push({ row, username, password });
   }
 
   // bcrypt cost 8 để nhập vài trăm học sinh không vượt thời gian chạy của Vercel;
   // học sinh bắt buộc đổi mật khẩu (cost 10) ở lần đăng nhập đầu.
   const hashes = await Promise.all(prepared.map((p) => hashPassword(p.password, 8)));
-  // Giao dịch dạng lô (gửi một lần), không dùng giao dịch tương tác: tạo từng em trong giao dịch
-  // tương tác sẽ vượt giới hạn thời gian khi cơ sở dữ liệu ở xa (Neon) và lớp đông.
-  await prisma.$transaction(
-    prepared.map((p, i) =>
-      prisma.user.create({
-        data: {
-          username: p.username,
-          fullName: p.row.fullName,
-          role: "STUDENT",
-          passwordHash: hashes[i],
-          mustChangePassword: true,
-          student: {
-            create: {
+  const fresh = prepared.map((p, i) => ({ ...p, hash: hashes[i], userId: randomUUID(), studentId: randomUUID() }));
+  const returningIds = returningRows.map((r) => r.student.id);
+  // Tổ của học sinh năm trước được đặt sau khi xếp lớp (xếp lớp bỏ tổ cũ)
+  for (const r of returningRows) {
+    if (r.groupNo) patches.push({ ...emptyPatch(r.student.id, r.student.userId), groupNo: r.groupNo });
+  }
+  const nameUpdates = patches.filter((p) => p.fullName);
+
+  // Một giao dịch dạng lô, số lệnh cố định
+  await prisma.$transaction([
+    ...(fresh.length
+      ? [
+          prisma.user.createMany({
+            data: fresh.map((p) => ({
+              id: p.userId,
+              username: p.username,
+              fullName: p.row.fullName,
+              role: "STUDENT" as const,
+              passwordHash: p.hash,
+              mustChangePassword: true,
+            })),
+          }),
+          prisma.student.createMany({
+            data: fresh.map((p) => ({
+              id: p.studentId,
+              userId: p.userId,
               classId,
               studentCode: p.row.studentCode,
               dateOfBirth: p.row.dateOfBirth,
@@ -228,13 +256,64 @@ async function createStudents(
               address: p.row.address,
               note: p.row.note,
               groupNo: toGroup(p.row.groupNo),
-              enrollments: { create: { classId, schoolYear: classroom.schoolYear } },
-            },
-          },
-        },
-      }),
-    ),
-  );
+            })),
+          }),
+          prisma.enrollment.createMany({
+            data: fresh.map((p) => ({ studentId: p.studentId, classId, schoolYear: classroom.schoolYear })),
+          }),
+        ]
+      : []),
+    ...(returningIds.length
+      ? [
+          prisma.enrollment.createMany({
+            data: returningIds.map((studentId) => ({ studentId, classId, schoolYear: classroom.schoolYear })),
+            skipDuplicates: true,
+          }),
+          prisma.student.updateMany({
+            where: { id: { in: returningIds }, classroom: { schoolYear: { lte: classroom.schoolYear } } },
+            data: { classId, groupNo: null, isMonitor: false, isGroupLeader: false },
+          }),
+          prisma.classTransfer.createMany({
+            data: returningRows.map((r) => ({
+              studentId: r.student.id,
+              fromClassId: r.student.classId,
+              toClassId: classId,
+              reason: "Nhập danh sách lớp năm học mới",
+              actorId,
+            })),
+          }),
+        ]
+      : []),
+    ...(nameUpdates.length
+      ? [
+          prisma.$executeRaw`
+            UPDATE "User" AS u SET "fullName" = v.full_name
+            FROM (VALUES ${Prisma.join(nameUpdates.map((p) => Prisma.sql`(${p.userId}::text, ${p.fullName}::text)`))}) AS v(id, full_name)
+            WHERE u."id" = v.id`,
+        ]
+      : []),
+    ...(patches.length
+      ? [
+          prisma.$executeRaw`
+            UPDATE "Student" AS s SET
+              "dateOfBirth" = COALESCE(v.dob, s."dateOfBirth"),
+              "gender" = COALESCE(v.gender, s."gender"),
+              "parentName" = COALESCE(v.parent_name, s."parentName"),
+              "parentPhone" = COALESCE(v.parent_phone, s."parentPhone"),
+              "address" = COALESCE(v.address, s."address"),
+              "note" = COALESCE(v.note, s."note"),
+              "isGroupLeader" = CASE WHEN v.grp IS NOT NULL AND v.grp IS DISTINCT FROM s."groupNo" THEN false ELSE s."isGroupLeader" END,
+              "groupNo" = COALESCE(v.grp, s."groupNo")
+            FROM (VALUES ${Prisma.join(
+              patches.map(
+                (p) =>
+                  Prisma.sql`(${p.studentId}::text, ${p.dateOfBirth}::text, ${p.gender}::text, ${p.parentName}::text, ${p.parentPhone}::text, ${p.address}::text, ${p.note}::text, ${p.groupNo}::int)`,
+              ),
+            )}) AS v(id, dob, gender, parent_name, parent_phone, address, note, grp)
+            WHERE s."id" = v.id`,
+        ]
+      : []),
+  ]);
   return {
     created: prepared.map((p) => ({ fullName: p.row.fullName, username: p.username, password: p.password })),
     enrolled,
@@ -256,7 +335,7 @@ export async function importStudentsAction(classId: string, _prev: ImportState, 
   if (rows.length === 0) return { error: "Không có dòng học sinh nào trong file." };
   if (rows.length > MAX_ROWS) return { error: `Mỗi lần nhập tối đa ${MAX_ROWS} học sinh.` };
 
-  const result = await createStudents(classroom, rows);
+  const result = await createStudents(classroom, rows, user.id);
   await audit(user, "student.import", {
     entity: "Classroom",
     entityId: classId,
@@ -294,7 +373,7 @@ export async function addStudentAction(classId: string, _prev: ImportState, form
       groupNo: get("groupNo"),
       note: get("note"),
     },
-  ]);
+  ], user.id);
   for (const c of result.enrolled) {
     await audit(user, "student.enroll", {
       classId,
