@@ -9,7 +9,7 @@ import { byVietnameseName, STUDENT_STATUS } from "@/lib/students";
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await getCurrentUser();
-  if (!user || user.mustChangePassword || user.role === "STUDENT") return new Response("Unauthorized", { status: 401 });
+  if (!user || user.role === "STUDENT") return new Response("Unauthorized", { status: 401 });
   const classroom = await prisma.classroom.findUnique({ where: { id } });
   if (!classroom || (user.role === "TEACHER" && classroom.homeroomTeacherId !== user.id)) {
     return new Response("Not found", { status: 404 });

@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { Role } from "@/lib/session";
 import { logoutAction } from "@/app/actions";
 import { NavLinks } from "./NavLinks";
+import { Avatar } from "./Avatar";
+import { PasswordReminder } from "./PasswordReminder";
 
 const NAV: Record<Role, { href: string; label: string }[]> = {
   ADMIN: [
@@ -31,7 +33,7 @@ export function AppShell({
   user,
   children,
 }: {
-  user: { fullName: string; role: Role };
+  user: { id: string; fullName: string; role: Role; avatarUpdatedAt: Date | null; mustChangePassword: boolean };
   children: React.ReactNode;
 }) {
   return (
@@ -43,12 +45,12 @@ export function AppShell({
           </Link>
           <NavLinks items={NAV[user.role]} />
           <div className="ml-auto flex items-center gap-3 text-sm">
-            <span className="hidden text-right sm:block">
-              <span className="block font-medium leading-tight">{user.fullName}</span>
-              <span className="block text-xs text-slate-500">{ROLE_LABEL[user.role]}</span>
-            </span>
-            <Link href="/doi-mat-khau" className="btn-secondary btn-sm">
-              Đổi mật khẩu
+            <Link href="/tai-khoan" className="flex items-center gap-2 rounded-lg px-1 py-0.5 hover:bg-slate-100" title="Tài khoản của tôi">
+              <Avatar user={user} size={32} />
+              <span className="hidden text-left sm:block">
+                <span className="block font-medium leading-tight">{user.fullName}</span>
+                <span className="block text-xs text-slate-500">{ROLE_LABEL[user.role]}</span>
+              </span>
             </Link>
             <form action={logoutAction}>
               <button className="btn-secondary btn-sm">Đăng xuất</button>
@@ -56,6 +58,7 @@ export function AppShell({
           </div>
         </div>
       </header>
+      {user.mustChangePassword && <PasswordReminder />}
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
     </div>
   );

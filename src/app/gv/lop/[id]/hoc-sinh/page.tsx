@@ -6,7 +6,8 @@ import { removeDiacritics } from "@/lib/format";
 import { classLockedMessage } from "@/lib/schoolYear";
 import { byVietnameseName, parseStatus, STUDENT_STATUS } from "@/lib/students";
 import { Badge, Empty } from "@/components/ui";
-import { DeleteStudentButton, ResetPasswordButton, ToggleActiveButton } from "@/components/AccountButtons";
+import { Avatar } from "@/components/Avatar";
+import { ClassPasswordForm, DeleteStudentButton, ResetPasswordButton, ToggleActiveButton } from "@/components/AccountButtons";
 import { AddStudentForm, ImportStudentsForm } from "./StudentForms";
 import { BatchBar, SelectAll } from "./BatchBar";
 import { BATCH_FORM_ID } from "./batch";
@@ -32,7 +33,7 @@ export default async function ClassStudentsPage({
   const roster = await prisma.student.findMany({
     where: { OR: [{ classId: id }, { enrollments: { some: { classId: id } } }] },
     include: {
-      user: { select: { id: true, fullName: true, username: true, active: true, mustChangePassword: true } },
+      user: { select: { id: true, fullName: true, username: true, active: true, mustChangePassword: true, avatarUpdatedAt: true } },
       classroom: { select: { name: true, schoolYear: true } },
     },
   });
@@ -69,6 +70,15 @@ export default async function ClassStudentsPage({
             </p>
             <ImportStudentsForm classId={id} className={classroom.name} />
           </div>
+
+          <details className="card">
+            <summary className="cursor-pointer font-semibold">Đặt lại mật khẩu cho cả lớp</summary>
+            <p className="mb-3 mt-2 text-sm text-slate-500">
+              Mật khẩu thầy/cô nhập được áp dụng cho tất cả học sinh <b>đang học</b> của lớp. Tên đăng nhập giữ nguyên. Khi đăng nhập, các em
+              được nhắc đổi sang mật khẩu riêng (không bắt buộc).
+            </p>
+            <ClassPasswordForm classId={id} className={classroom.name} count={counts.ACTIVE} />
+          </details>
 
           <details className="card">
             <summary className="cursor-pointer font-semibold">+ Thêm một học sinh</summary>
@@ -174,14 +184,17 @@ export default async function ClassStudentsPage({
                   )}
                   <td>{i + 1}</td>
                   <td>
-                    <Link href={`/gv/hoc-sinh/${s.id}`} className="link">
-                      {s.user.fullName}
-                    </Link>
+                    <span className="flex items-center gap-2">
+                      <Avatar user={s.user} size={28} />
+                      <Link href={`/gv/hoc-sinh/${s.id}`} className="link">
+                        {s.user.fullName}
+                      </Link>
+                    </span>
                     <div className="mt-0.5 flex flex-wrap gap-1">
                       {s.status !== "ACTIVE" && <Badge className={STUDENT_STATUS[s.status].style}>{STUDENT_STATUS[s.status].label}</Badge>}
                       {s.status === "ACTIVE" && !s.user.active && <Badge className="bg-slate-100 text-slate-600 ring-slate-200">Đã khóa</Badge>}
                       {s.user.mustChangePassword && s.user.active && (
-                        <Badge className="bg-slate-50 text-slate-500 ring-slate-200">Chưa đăng nhập lần đầu</Badge>
+                        <Badge className="bg-slate-50 text-slate-500 ring-slate-200">Đang dùng mật khẩu được cấp</Badge>
                       )}
                     </div>
                     {s.note && <div className="mt-0.5 text-xs text-slate-500">{s.note}</div>}

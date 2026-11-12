@@ -9,7 +9,7 @@ Công nghệ: Next.js 15, PostgreSQL (Neon) + Prisma, Tailwind CSS. Triển khai
 | Vai trò | Làm được gì |
 |---|---|
 | **Quản trị** | Quản lý năm học (mốc thời gian, khóa năm học, tạo lớp năm mới từ năm trước), xếp lớp học sinh theo năm học (mỗi học sinh 1 lớp/năm), tạo/sửa/khóa tài khoản giáo viên, tạo lớp, phân công GVCN, chuyển lớp cho học sinh, xóa cứng học sinh (có lưu vết), xem nhật ký thao tác, xem tổng quan toàn trường, tạo mẫu phiếu dùng chung |
-| **Giáo viên** | Quản lý tổ (tạo, đặt tên, thêm/bớt học sinh, chọn tổ trưởng), tiêu chí chấm điểm của lớp, duyệt phiếu tuần (duyệt & công bố, yêu cầu sửa, duyệt tất cả, chốt điểm, chấm thay), xác nhận bổ sung của tổ trưởng, xóa hẳn học sinh lớp mình (có lưu vết), nhập/xuất danh sách học sinh Excel, tìm kiếm và lọc theo tổ/trạng thái, cập nhật hàng loạt (phân tổ, nghỉ học, chuyển trường), cấp lại mật khẩu, soạn mẫu phiếu, tạo đợt tự đánh giá (tự đặt giờ mở/đóng), theo dõi tỷ lệ nộp, xem học sinh cần quan tâm, viết nhận xét và mục tiêu tuần tới, ghi nhận hành động tích cực, xem biểu đồ tiến bộ |
+| **Giáo viên** | Đặt lại mật khẩu chung cho cả lớp, tiêu chí xếp hạng tổ (tự động hoặc chấm tay, mỗi tiêu chí cộng/trừ sao, 1 sao quy ra điểm), quản lý tổ (tạo, đặt tên, thêm/bớt học sinh, chọn tổ trưởng), tiêu chí chấm điểm của lớp, duyệt phiếu tuần (duyệt & công bố, yêu cầu sửa, duyệt tất cả, chốt điểm, chấm thay), xác nhận bổ sung của tổ trưởng, xóa hẳn học sinh lớp mình (có lưu vết), nhập/xuất danh sách học sinh Excel, tìm kiếm và lọc theo tổ/trạng thái, cập nhật hàng loạt (phân tổ, nghỉ học, chuyển trường), cấp lại mật khẩu, soạn mẫu phiếu, tạo đợt tự đánh giá (tự đặt giờ mở/đóng), theo dõi tỷ lệ nộp, xem học sinh cần quan tâm, viết nhận xét và mục tiêu tuần tới, ghi nhận hành động tích cực, xem biểu đồ tiến bộ |
 | **Học sinh** | Đăng nhập, làm phiếu tuần (tự khai số lần theo tiêu chí + tự nhận xét), xem điểm và xếp loại sau khi được duyệt, sửa phiếu khi GV yêu cầu; **tổ trưởng** xem phần tự chấm của các bạn trong tổ mình (không xem tổ khác) và đề xuất bổ sung vi phạm/nhận xét cho tổ viên, nhận phản hồi, xem hành trình tiến bộ và các mục tiêu, tự cập nhật địa chỉ |
 
 ## Không dùng AI: gợi ý theo quy tắc
@@ -72,6 +72,8 @@ Khi thay đổi `prisma/schema.prisma`, chạy `npx prisma migrate dev --name <t
   Mỗi trang đều kiểm tra lại quyền trong cơ sở dữ liệu.
 - Giáo viên chỉ xem được lớp mình chủ nhiệm. Ghi chú loại "Cần quan tâm" học sinh không thấy được.
 - Học sinh nghỉ học/chuyển trường được đổi trạng thái (tài khoản bị khóa, hồ sơ và phiếu vẫn giữ). Chỉ quản trị được xóa cứng, và bản chụp dữ liệu được lưu trong *Nhật ký thao tác*.
+- Đăng nhập bằng mật khẩu được cấp (tạo tài khoản, cấp lại, đặt lại cả lớp) không bị bắt đổi ngay: hệ thống chỉ nhắc "Đổi mật khẩu / Để sau".
+- Mọi người dùng tự cập nhật ảnh đại diện ở trang *Tài khoản*; ảnh được thu nhỏ trên máy (~256px) và lưu trong cơ sở dữ liệu, chỉ người đã đăng nhập mới xem được.
 - Mã học sinh không được trùng trong cùng một năm học (mỗi học sinh một tài khoản/năm học).
 - Các thao tác quan trọng (đăng nhập GV/quản trị, đăng nhập sai, cấp lại mật khẩu, khóa tài khoản, thêm/sửa/chuyển/xóa học sinh, xuất Excel...) được ghi vào *Nhật ký thao tác*.
 - Đây là dữ liệu cá nhân của học sinh (Nghị định 13/2023/NĐ-CP).

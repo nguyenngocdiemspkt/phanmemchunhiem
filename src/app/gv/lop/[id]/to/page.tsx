@@ -6,6 +6,7 @@ import { groupName } from "@/lib/scoring";
 import { byVietnameseName } from "@/lib/students";
 import { GROUP_COLORS } from "@/lib/emulation";
 import { Badge, Empty } from "@/components/ui";
+import { Avatar } from "@/components/Avatar";
 import { SubmitButton } from "@/components/SubmitButton";
 import { AddGroupForm, AddMembersForm } from "./GroupForms";
 
@@ -15,7 +16,7 @@ export default async function GroupsPage({ params }: { params: Promise<{ id: str
   const locked = await classLockedMessage(classroom);
   const students = await prisma.student.findMany({
     where: { classId: id, status: "ACTIVE" },
-    select: { id: true, groupNo: true, isGroupLeader: true, studentCode: true, user: { select: { fullName: true } } },
+    select: { id: true, groupNo: true, isGroupLeader: true, studentCode: true, user: { select: { id: true, fullName: true, avatarUpdatedAt: true } } },
   });
   students.sort(byVietnameseName((s) => s.user.fullName));
   const groups = Array.from({ length: classroom.groupCount }, (_, i) => i + 1);
@@ -66,7 +67,8 @@ export default async function GroupsPage({ params }: { params: Promise<{ id: str
                 <ul className="mt-3 divide-y divide-slate-100">
                   {members.map((m) => (
                     <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                      <span>
+                      <span className="flex items-center gap-2">
+                        <Avatar user={m.user} size={28} />
                         {m.user.fullName}{" "}
                         {m.isGroupLeader && <Badge className="bg-violet-50 text-violet-800 ring-violet-200">Tổ trưởng</Badge>}
                       </span>

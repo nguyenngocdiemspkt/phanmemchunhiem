@@ -1,5 +1,7 @@
 // Chấm điểm thi đua cá nhân theo tiêu chí. Dùng chung cho client và server (không import Prisma ở đây).
 
+import type { GroupCriterionKind } from "@prisma/client";
+
 /** Tiêu chí trong bản chụp của đợt: điểm cho mỗi lần (dương = cộng, âm = trừ) */
 export type Criterion = { id: string; name: string; points: number };
 export type Counts = Record<string, number>;
@@ -92,3 +94,14 @@ export function groupName(names: unknown, n: number) {
 export function signed(n: number) {
   return n > 0 ? `+${n}` : String(n);
 }
+
+/** Các loại tiêu chí xếp hạng tổ; loại tự động được tính từ phiếu tuần đã duyệt */
+export const GROUP_KIND: Record<GroupCriterionKind, { label: string; hint: string }> = {
+  NO_VIOLATION: {
+    label: "Tự động: cả tổ không ai vi phạm",
+    hint: "Có phiếu đã duyệt trong tuần, không phiếu nào có tiêu chí trừ điểm và tổ không bị ghi điểm trừ trực tiếp",
+  },
+  ALL_SUBMITTED: { label: "Tự động: đủ phiếu cả tổ", hint: "Mọi thành viên đang học của tổ có phiếu tuần đã duyệt" },
+  ALL_GOOD: { label: "Tự động: cả tổ xếp loại Tốt", hint: "Mọi thành viên có phiếu đã duyệt và đều đạt mức Tốt" },
+  MANUAL: { label: "GVCN chấm tay", hint: "Thầy/cô tick cho tổ đạt ở bảng thi đua của từng tuần" },
+};

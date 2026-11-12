@@ -27,16 +27,19 @@ enum NoteType {
 }
 
 model User {
-  id                 String   @id @default(cuid())
-  username           String   @unique
+  id                 String      @id @default(cuid())
+  username           String      @unique
   passwordHash       String
   fullName           String
   role               Role
-  active             Boolean  @default(true)
-  mustChangePassword Boolean  @default(true)
+  active             Boolean     @default(true)
+  mustChangePassword Boolean     @default(true)
   email              String?
   phone              String?
-  createdAt          DateTime @default(now())
+  createdAt          DateTime    @default(now())
+  /// Thời điểm cập nhật ảnh đại diện (null = chưa có ảnh); dùng làm tham số chống cache
+  avatarUpdatedAt    DateTime?
+  avatar             UserAvatar?
 
   student          Student?
   homeroomClasses  Classroom[]       @relation("Homeroom")
@@ -82,6 +85,8 @@ model Classroom {
   ratingGood        Int        @default(100)
   ratingFair        Int        @default(95)
   ratingPass        Int        @default(85)
+  /// Mỗi sao của tiêu chí xếp hạng tổ được quy ra bao nhiêu điểm
+  starPoints        Int        @default(10)
   createdAt         DateTime   @default(now())
 
   students            Student[]
@@ -90,6 +95,8 @@ model Classroom {
   emulationRecords    EmulationRecord[]
   transfersOut        ClassTransfer[]     @relation("TransferFrom")
   enrollments         Enrollment[]
+  groupCriteria       GroupCriterion[]
+  groupAwards         GroupAward[]
   transfersIn         ClassTransfer[]     @relation("TransferTo")
 
   @@unique([name, schoolYear])
@@ -300,6 +307,59 @@ model AuditLog {
   @@index([createdAt])
   @@index([classId, createdAt])
   @@index([entity, entityId])
+}
+
+/// Ảnh đại diện để ở bảng riêng để các truy vấn người dùng thường ngày không phải tải ảnh
+model UserAvatar {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Ảnh đã thu nhỏ trên máy người dùng (~256px)
+  data      Bytes
+  type      String
+  updatedAt DateTime @updatedAt
+}
+
+enum GroupCriterionKind {
+  NO_VIOLATION // Tự động: cả tổ không ai vi phạm trong tuần
+  ALL_SUBMITTED // Tự động: mọi thành viên có phiếu tuần đã duyệt
+  ALL_GOOD // Tự động: mọi thành viên xếp loại Tốt
+  MANUAL // GVCN tick cho tổ đạt mỗi tuần
+}
+
+/// Tiêu chí xếp hạng tổ của lớp: tổ đạt trong tuần được cộng (hoặc trừ) số sao
+model GroupCriterion {
+  id        String             @id @default(cuid())
+  classId   String
+  classroom Classroom          @relation(fields: [classId], references: [id], onDelete: Cascade)
+  name      String
+  kind      GroupCriterionKind
+  stars     Int                @default(1)
+  active    Boolean            @default(true)
+  sortOrder Int                @default(0)
+  createdAt DateTime           @default(now())
+
+  awards GroupAward[]
+
+  @@index([classId])
+}
+
+/// GVCN tick tiêu chí tay cho một tổ trong một tuần. Tên và số sao được chụp lại lúc tick.
+model GroupAward {
+  id          String          @id @default(cuid())
+  classId     String
+  classroom   Classroom       @relation(fields: [classId], references: [id], onDelete: Cascade)
+  criterionId String?
+  criterion   GroupCriterion? @relation(fields: [criterionId], references: [id], onDelete: SetNull)
+  name        String
+  stars       Int
+  groupNo     Int
+  /// 0h thứ Hai (giờ VN) của tuần được tính
+  weekStart   DateTime
+  authorId    String?
+  createdAt   DateTime        @default(now())
+
+  @@unique([criterionId, groupNo, weekStart])
+  @@index([classId, weekStart])
 }
 
 enum ReportStatus {

@@ -7,7 +7,7 @@ export default async function StudentEmulationPage({ searchParams }: { searchPar
   const { student } = await requireStudent();
   const { user, classroom, level } = await requireEmulationAccess(student.classId);
   const week = weekRange((await searchParams).tuan);
-  const data = await loadEmulationBoard(student.classId, classroom.groupCount, week, classroom.groupNames);
+  const data = await loadEmulationBoard(classroom, week);
 
   return (
     <div className="space-y-4">

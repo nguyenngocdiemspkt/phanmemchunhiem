@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
-import { deleteStudentAction, resetPasswordAction, toggleActiveAction } from "@/lib/accountActions";
+import { deleteStudentAction, resetClassPasswordsAction, resetPasswordAction, toggleActiveAction } from "@/lib/accountActions";
+import { FormMessage } from "./ui";
 import { SubmitButton } from "./SubmitButton";
 
 export function ResetPasswordButton({ userId, name }: { userId: string; name: string }) {
@@ -53,6 +54,38 @@ export function DeleteStudentButton({ userId, name }: { userId: string; name: st
       >
         Xóa
       </SubmitButton>
+    </form>
+  );
+}
+
+export function ClassPasswordForm({ classId, className, count }: { classId: string; className: string; count: number }) {
+  const [state, action, pending] = useActionState(resetClassPasswordsAction.bind(null, classId), null);
+  return (
+    <form
+      action={action}
+      className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]"
+      onSubmit={(e) => {
+        if (!confirm(`Đặt mật khẩu này cho tất cả ${count} học sinh đang học của lớp ${className}? Mật khẩu cũ của các em sẽ không dùng được nữa.`)) {
+          e.preventDefault();
+        }
+      }}
+    >
+      <div>
+        <label className="label">Mật khẩu chung mới</label>
+        <input name="password" type="text" minLength={6} className="input font-mono" autoComplete="off" required />
+      </div>
+      <div>
+        <label className="label">Nhập lại mật khẩu</label>
+        <input name="confirm" type="text" minLength={6} className="input font-mono" autoComplete="off" required />
+      </div>
+      <div className="flex items-end">
+        <button className="btn-danger" disabled={pending || count === 0}>
+          {pending ? "Đang đặt lại..." : `Áp dụng cho ${count} học sinh`}
+        </button>
+      </div>
+      <div className="sm:col-span-3">
+        <FormMessage state={state} />
+      </div>
     </form>
   );
 }

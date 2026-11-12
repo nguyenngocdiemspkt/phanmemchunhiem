@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "./db";
-import { hashPassword, randomPassword, requireUser } from "./auth";
+import { hashPassword, randomPassword, requireClassAccess, requireUser } from "./auth";
 import { audit } from "./audit";
 import { classLockedMessage } from "./schoolYear";
 
@@ -88,4 +88,32 @@ export async function deleteStudentAction(userId: string) {
   });
   await prisma.user.delete({ where: { id: userId } });
   revalidatePath("/", "layout");
+}
+
+export type ClassPasswordState = { error?: string; ok?: string } | null;
+
+/**
+ * GVCN đặt một mật khẩu chung cho tất cả học sinh đang học của lớp. Học sinh đăng nhập được ngay
+ * và được nhắc (không bắt buộc) đổi sang mật khẩu riêng.
+ */
+export async function resetClassPasswordsAction(classId: string, _prev: ClassPasswordState, formData: FormData): Promise<ClassPasswordState> {
+  const { user, classroom } = await requireClassAccess(classId);
+  const locked = await classLockedMessage(classroom);
+  if (locked) return { error: locked };
+  const password = String(formData.get("password") ?? "");
+  if (password.length < 6) return { error: "Mật khẩu phải có ít nhất 6 ký tự." };
+  if (password !== String(formData.get("confirm") ?? "")) return { error: "Nhập lại mật khẩu không khớp." };
+  // Một mã băm cho cả lớp, một câu lệnh cập nhật
+  const passwordHash = await hashPassword(password);
+  const { count } = await prisma.user.updateMany({
+    where: { role: "STUDENT", student: { classId, status: "ACTIVE" } },
+    data: { passwordHash, mustChangePassword: true },
+  });
+  await audit(user, "auth.reset-class", {
+    entity: "Classroom",
+    entityId: classId,
+    classId,
+    summary: `Đặt lại mật khẩu chung cho ${count} học sinh lớp ${classroom.name}`,
+  });
+  return { ok: `Đã đặt lại mật khẩu cho ${count} học sinh đang học của lớp ${classroom.name}.` };
 }
