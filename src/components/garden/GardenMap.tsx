@@ -234,13 +234,13 @@ export function GardenMap({
                     <Plant seed={p.seed} state={p.state} />
                   </g>
                 ) : (
-                  <text x={TILE / 2} y={TILE - 1} textAnchor="middle" fontSize={9} fill="#fef3c7">
+                  <text x={TILE / 2} y={TILE - 13} textAnchor="middle" fontSize={8} fill="#1f3d17" opacity={0.7}>
                     chưa gieo
                   </text>
                 )}
-                {/* Tên chủ ô đất */}
-                <text x={TILE / 2} y={TILE + 13} textAnchor="middle" fontSize={8.5} fontWeight={isMine ? 700 : 500} fill={isMine ? "#78350f" : "#1f3d17"}>
-                  {p.name.trim().split(/s+/).at(-1)}
+                {/* Tên chủ ô đất, viết trên luống đất để không chồng với tên nhân vật */}
+                <text x={TILE / 2} y={TILE + 0.5} textAnchor="middle" fontSize={8} fontWeight={isMine ? 700 : 600} fill={isMine ? "#fde68a" : "#fef3c7"}>
+                  {p.name.trim().split(/\s+/).at(-1)}
                 </text>
               </g>
             );
