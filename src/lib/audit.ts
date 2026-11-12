@@ -37,4 +37,5 @@ export const AUDIT_GROUPS: Record<string, string> = {
   year: "Năm học",
   class: "Lớp học",
   student: "Học sinh",
+  feature: "Đề xuất chức năng",
 };

@@ -160,6 +160,7 @@ model Student {
   deedsDone        GoodDeed[]        @relation("DeedAuthor")
   deedsReceived    GoodDeed[]        @relation("DeedBeneficiary")
   harvests         GardenHarvest[]
+  featureRequests  FeatureRequest[]
   notes            Note[]
   emulationRecords EmulationRecord[]
 
@@ -507,4 +508,29 @@ model SystemSetting {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt
+}
+
+enum FeatureRequestStatus {
+  NEW // Mới gửi
+  PLANNED // Đã đưa vào kế hoạch
+  DONE // Đã làm
+  DECLINED // Chưa/không làm
+}
+
+/// Học sinh đề xuất chức năng mới cho phần mềm; quản trị xem và phản hồi
+model FeatureRequest {
+  id          String               @id @default(cuid())
+  studentId   String?
+  student     Student?             @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  /// Họ tên và lớp lúc gửi, giữ lại kể cả khi học sinh bị xóa
+  authorName  String
+  className   String
+  title       String
+  description String
+  status      FeatureRequestStatus @default(NEW)
+  adminNote   String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([status, createdAt])
 }

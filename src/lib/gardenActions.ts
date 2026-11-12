@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "./db";
 import { requireClassAccess, requireStudent, requireUser } from "./auth";
 import { audit } from "./audit";
-import { mapSize, parseCharacter, SEEDS } from "./garden";
+import { gardenLayout, parseCharacter, SEEDS } from "./garden";
 import { getGardenPreset, readGardenSettings, saveGardenPreset, type GardenSettings } from "./gardenPreset";
 import { cycleOf } from "./gardenService";
 
@@ -39,8 +39,10 @@ export async function chooseSeedAction(seed: string): Promise<GardenState> {
 export async function moveAction(x: number, y: number) {
   const { student } = await requireStudent();
   const count = await prisma.student.count({ where: { classId: student.classId, status: "ACTIVE" } });
-  const { w, h } = mapSize(count);
+  const { w, h, blocked } = gardenLayout(count);
   if (!Number.isInteger(x) || !Number.isInteger(y)) return;
+  // Không đứng lên ô đất, thân cây cổ thụ, ghế đá, ao
+  if (blocked.includes(`${x},${y}`)) return;
   await prisma.student.update({
     where: { id: student.id },
     data: { posX: Math.min(w - 2, Math.max(1, x)), posY: Math.min(h - 2, Math.max(1, y)), posAt: new Date() },

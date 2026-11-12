@@ -9,7 +9,7 @@ import { resetGardenToPresetAction, saveGardenSettingsAction } from "@/lib/garde
 export default async function ClassGardenPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await requireClassAccess(id);
-  const { classroom, cycle, plots, size } = await loadGarden(id);
+  const { classroom, cycle, plots, layout } = await loadGarden(id);
   const planted = plots.filter((p) => p.seed).length;
 
   return (
@@ -17,7 +17,7 @@ export default async function ClassGardenPage({ params }: { params: Promise<{ id
       <p className="text-sm text-slate-500">
         {cycle.label} · {planted}/{plots.length} học sinh đã gieo hạt. Bấm vào ô đất để xem cây của từng em.
       </p>
-      <GardenMap classId={id} className={classroom.name} plots={plots} meId={null} size={size} thresholds={pickThresholds(classroom)} />
+      <GardenMap classId={id} className={classroom.name} plots={plots} meId={null} layout={layout} thresholds={pickThresholds(classroom)} />
 
       <div className="card overflow-x-auto p-0 sm:p-0">
         <table className="table">

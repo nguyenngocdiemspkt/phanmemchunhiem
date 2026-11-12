@@ -163,8 +163,8 @@ export const TILE = 32;
 
 /** Kích thước bản đồ (ô lưới) theo số học sinh */
 export function mapSize(count: number) {
-  const rows = Math.max(1, Math.ceil(count / PLOTS_PER_ROW));
-  return { w: PLOTS_PER_ROW * 2 + 4, h: rows * 3 + 7 };
+  const { w, h } = gardenLayout(count);
+  return { w, h };
 }
 
 /** Vị trí ô đất thứ i (ô lưới, góc trên trái của ô đất) */
@@ -172,3 +172,88 @@ export function plotPos(i: number) {
   return { x: 2 + (i % PLOTS_PER_ROW) * 2, y: 4 + Math.floor(i / PLOTS_PER_ROW) * 3 };
 }
 
+
+// ---------- Bố cục vườn: ô đất, cây cổ thụ, khu ghế đá, ao ----------
+
+export type Rect = { x: number; y: number; w: number; h: number };
+export type BenchZone = { id: string; zone: Rect; benches: Rect[] };
+export type GardenLayout = {
+  w: number;
+  h: number;
+  /** Gốc cây cổ thụ (ô lưới); thân chiếm 2 ô (x, y) và (x+1, y), tán vẽ lớn hơn */
+  oldTrees: { x: number; y: number }[];
+  /** Khu ghế đá: đứng trong zone thì nghe rõ những người cùng khu */
+  benchZones: BenchZone[];
+  pond: Rect;
+  /** Các ô không đi qua được, dạng "x,y" */
+  blocked: string[];
+};
+
+const DECOR_X = PLOTS_PER_ROW * 2 + 3;
+
+/** Bố cục vườn theo số học sinh: khu ô đất bên trái, khu cây cổ thụ – ghế đá – ao bên phải */
+export function gardenLayout(count: number): GardenLayout {
+  const rows = Math.max(1, Math.ceil(count / PLOTS_PER_ROW));
+  const w = DECOR_X + 11;
+  // Đủ cao để cây cổ thụ cuối không che ghế đá 2
+  const h = Math.max(rows * 3 + 7, 22);
+  const oldTrees = [
+    { x: DECOR_X + 1, y: 5 },
+    { x: DECOR_X + 1, y: 12 },
+    { x: DECOR_X + 8, y: h - 3 },
+  ];
+  const benchZones: BenchZone[] = [
+    { id: "ghe-1", zone: { x: DECOR_X + 4, y: 3, w: 6, h: 5 }, benches: [{ x: DECOR_X + 5, y: 3, w: 4, h: 1 }, { x: DECOR_X + 5, y: 7, w: 4, h: 1 }] },
+    { id: "ghe-2", zone: { x: DECOR_X + 4, y: 10, w: 6, h: 5 }, benches: [{ x: DECOR_X + 5, y: 10, w: 4, h: 1 }, { x: DECOR_X + 5, y: 14, w: 4, h: 1 }] },
+  ];
+  const pond: Rect = { x: DECOR_X, y: h - 4, w: 4, h: 2 };
+
+  const blocked = new Set<string>();
+  const block = (r: Rect) => {
+    for (let x = r.x; x < r.x + r.w; x++) for (let y = r.y; y < r.y + r.h; y++) blocked.add(`${x},${y}`);
+  };
+  for (let i = 0; i < count; i++) {
+    const p = plotPos(i);
+    block({ x: p.x, y: p.y, w: 1, h: 1 });
+  }
+  for (const t of oldTrees) block({ x: t.x, y: t.y, w: 2, h: 1 });
+  for (const b of benchZones) for (const bench of b.benches) block(bench);
+  block(pond);
+  return { w, h, oldTrees, benchZones, pond, blocked: [...blocked] };
+}
+
+/** Khu ghế đá chứa ô (x, y), nếu có */
+export function benchZoneAt(layout: Pick<GardenLayout, "benchZones">, x: number, y: number) {
+  return layout.benchZones.find((b) => x >= b.zone.x && x < b.zone.x + b.zone.w && y >= b.zone.y && y < b.zone.y + b.zone.h) ?? null;
+}
+
+/**
+ * Tìm đường đi ngắn nhất (theo 4 hướng) tránh các ô bị chặn; trả về danh sách bước, rỗng nếu không tới được.
+ * Bản đồ chỉ vài trăm ô nên tìm theo chiều rộng là đủ nhanh.
+ */
+export function findPath(from: { x: number; y: number }, to: { x: number; y: number }, layout: Pick<GardenLayout, "w" | "h">, blocked: Set<string>) {
+  const inside = (x: number, y: number) => x >= 1 && y >= 1 && x <= layout.w - 2 && y <= layout.h - 2;
+  if (!inside(to.x, to.y) || blocked.has(`${to.x},${to.y}`)) return [];
+  const key = (x: number, y: number) => `${x},${y}`;
+  const prev = new Map<string, string | null>([[key(from.x, from.y), null]]);
+  const queue: [number, number][] = [[from.x, from.y]];
+  while (queue.length) {
+    const [x, y] = queue.shift()!;
+    if (x === to.x && y === to.y) break;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx;
+      const ny = y + dy;
+      const k = key(nx, ny);
+      if (!inside(nx, ny) || blocked.has(k) || prev.has(k)) continue;
+      prev.set(k, key(x, y));
+      queue.push([nx, ny]);
+    }
+  }
+  if (!prev.has(key(to.x, to.y))) return [];
+  const path: { x: number; y: number }[] = [];
+  for (let k: string | null = key(to.x, to.y); k && k !== key(from.x, from.y); k = prev.get(k) ?? null) {
+    const [x, y] = k.split(",").map(Number);
+    path.unshift({ x, y });
+  }
+  return path;
+}

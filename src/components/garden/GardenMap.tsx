@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { nextGoal, plantLabel, plotPos, SEEDS, TILE, type Character, type GardenThresholds, type PlantState } from "@/lib/garden";
+import { benchZoneAt, findPath, nextGoal, plantLabel, plotPos, SEEDS, TILE, type Character, type GardenLayout, type GardenThresholds, type PlantState } from "@/lib/garden";
 import { moveAction } from "@/lib/gardenActions";
 import { Person, Plant } from "./Art";
 
@@ -11,8 +11,10 @@ export type MapPlot = {
   character: Character;
   seed: string | null;
   state: PlantState;
-  /** Điểm vườn: chỉ có với chính em hoặc khi giáo viên xem */
-  score: number | null;
+  score: number;
+  fromSheets: number;
+  fromDeeds: number;
+  deeds: { title: string; points: number; helped: boolean }[];
   plot: number;
   x: number;
   y: number;
@@ -22,51 +24,105 @@ const STEP_MS = 140;
 const POLL_MS = 5000;
 const SAVE_DELAY_MS = 1200;
 
+function signed(n: number) {
+  return n > 0 ? `+${n}` : String(n);
+}
+
+/** Cây cổ thụ: thân to, rễ nổi, tán nhiều tầng */
+function OldTree({ x, y }: { x: number; y: number }) {
+  const cx = (x + 1) * TILE;
+  const base = (y + 1) * TILE - 4;
+  return (
+    <g>
+      <ellipse cx={cx} cy={base + 2} rx={TILE * 1.4} ry={TILE * 0.35} fill="#00000022" />
+      <path d={`M${cx - 12} ${base} q4 -6 6 -34 h12 q2 28 6 34 q-6 -4 -12 -2 q-6 -2 -12 2 Z`} fill="#6b3f1d" stroke="#4a2a12" strokeWidth={1.5} />
+      <path d={`M${cx - 3} ${base - 22} q-1 8 1 16`} stroke="#4a2a12" strokeWidth={1.2} fill="none" />
+      {[
+        [-26, -50, 26],
+        [24, -48, 26],
+        [0, -66, 30],
+        [-10, -40, 22],
+        [14, -38, 22],
+      ].map(([dx, dy, r], i) => (
+        <circle key={i} cx={cx + dx} cy={base + dy} r={r} fill={i % 2 ? "#2f6b2a" : "#3a7d33"} stroke="#24531f" strokeWidth={1} />
+      ))}
+      {[
+        [-14, -58],
+        [10, -70],
+        [22, -52],
+        [-24, -44],
+      ].map(([dx, dy], i) => (
+        <circle key={i} cx={cx + dx} cy={base + dy} r={5} fill="#4f9a44" opacity={0.7} />
+      ))}
+    </g>
+  );
+}
+
+/** Ghế đá */
+function Bench({ x, y, w }: { x: number; y: number; w: number }) {
+  return (
+    <g>
+      <rect x={x * TILE + 4} y={y * TILE + 10} width={w * TILE - 8} height={12} rx={4} fill="#b8b3a8" stroke="#8a857a" strokeWidth={1.5} />
+      <rect x={x * TILE + 10} y={y * TILE + 21} width={6} height={8} fill="#8a857a" />
+      <rect x={(x + w) * TILE - 16} y={y * TILE + 21} width={6} height={8} fill="#8a857a" />
+    </g>
+  );
+}
+
 /**
  * Bản đồ vườn lớp nhìn từ trên xuống. Học sinh điều khiển nhân vật của mình (phím mũi tên/WASD, chạm, nút);
- * vị trí các bạn được cập nhật vài giây một lần. Giáo viên chỉ xem, bấm vào ô đất để xem cây.
+ * không đi xuyên ô đất, cây cổ thụ, ghế đá, ao. Giáo viên chỉ xem, bấm vào ô đất để xem cây.
  */
 export function GardenMap({
   classId,
   className,
   plots,
   meId,
-  size,
+  layout,
   thresholds,
 }: {
   classId: string;
   className: string;
   plots: MapPlot[];
   meId: string | null;
-  size: { w: number; h: number };
+  layout: GardenLayout;
   thresholds: GardenThresholds;
 }) {
   const me = plots.find((p) => p.id === meId) ?? null;
+  const blocked = useMemo(() => new Set(layout.blocked), [layout]);
   const [pos, setPos] = useState<Record<string, { x: number; y: number }>>(() => Object.fromEntries(plots.map((p) => [p.id, { x: p.x, y: p.y }])));
-  const [target, setTarget] = useState<{ x: number; y: number } | null>(null);
+  const [path, setPath] = useState<{ x: number; y: number }[]>([]);
   const [walking, setWalking] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  const clamp = useCallback((x: number, y: number) => ({ x: Math.min(size.w - 2, Math.max(1, x)), y: Math.min(size.h - 2, Math.max(1, y)) }), [size]);
+  const free = useCallback(
+    (x: number, y: number) => x >= 1 && y >= 1 && x <= layout.w - 2 && y <= layout.h - 2 && !blocked.has(`${x},${y}`),
+    [layout, blocked],
+  );
+
+  /** Đi tới ô (x, y) nếu ô đó trống; lưu vị trí khi em dừng lại */
+  const moveTo = useCallback(
+    (x: number, y: number) => {
+      if (!meId || !free(x, y)) return false;
+      setPos((prev) => ({ ...prev, [meId]: { x, y } }));
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => void moveAction(x, y), SAVE_DELAY_MS);
+      setWalking(true);
+      setSelected(null);
+      return true;
+    },
+    [meId, free],
+  );
 
   const step = useCallback(
     (dx: number, dy: number) => {
       if (!meId) return;
-      setPos((prev) => {
-        const cur = prev[meId];
-        const next = clamp(cur.x + dx, cur.y + dy);
-        if (next.x === cur.x && next.y === cur.y) return prev;
-        // Lưu vị trí khi em dừng di chuyển
-        if (saveTimer.current) clearTimeout(saveTimer.current);
-        saveTimer.current = setTimeout(() => void moveAction(next.x, next.y), SAVE_DELAY_MS);
-        return { ...prev, [meId]: next };
-      });
-      setWalking(true);
-      setSelected(null);
+      const cur = pos[meId];
+      moveTo(cur.x + dx, cur.y + dy);
     },
-    [meId, clamp],
+    [meId, pos, moveTo],
   );
 
   // Bàn phím
@@ -89,7 +145,7 @@ export function GardenMap({
       const k = keys[e.key] ?? keys[e.key.toLowerCase()];
       if (!k) return;
       e.preventDefault();
-      setTarget(null);
+      setPath([]);
       const now = Date.now();
       if (now - last < STEP_MS) return;
       last = now;
@@ -104,26 +160,19 @@ export function GardenMap({
     };
   }, [meId, step]);
 
-  // Đi tới điểm đã chạm, từng ô một
+  // Đi theo đường đã tìm khi chạm vào bản đồ
   useEffect(() => {
-    if (!target || !meId) return;
-    const timer = setInterval(() => {
-      const cur = pos[meId];
-      const dx = Math.sign(target.x - cur.x);
-      const dy = Math.sign(target.y - cur.y);
-      if (!dx && !dy) {
-        setTarget(null);
-        setWalking(false);
-        return;
-      }
-      // Đi theo trục còn xa hơn trước
-      if (Math.abs(target.x - cur.x) >= Math.abs(target.y - cur.y)) step(dx, 0);
-      else step(0, dy);
+    if (path.length === 0) return;
+    const timer = setTimeout(() => {
+      const [next, ...rest] = path;
+      if (!moveTo(next.x, next.y)) return setPath([]);
+      setPath(rest);
+      if (rest.length === 0) setWalking(false);
     }, STEP_MS);
-    return () => clearInterval(timer);
-  }, [target, meId, pos, step]);
+    return () => clearTimeout(timer);
+  }, [path, moveTo]);
 
-  // Cập nhật vị trí các bạn
+  // Cập nhật vị trí các bạn (sẽ thay bằng kết nối realtime ở bước sau)
   useEffect(() => {
     let stopped = false;
     const poll = async () => {
@@ -150,7 +199,7 @@ export function GardenMap({
 
   useEffect(() => () => void (saveTimer.current && clearTimeout(saveTimer.current)), []);
 
-  // Ô đất gần nhân vật của em nhất (trong bán kính ~1.5 ô), hoặc ô giáo viên chọn
+  // Ô đất gần nhân vật của em nhất, hoặc ô giáo viên chọn
   const nearby = useMemo(() => {
     if (selected) return plots.find((p) => p.id === selected) ?? null;
     if (!meId) return null;
@@ -159,7 +208,7 @@ export function GardenMap({
     let bestD = 2.3;
     for (const p of plots) {
       const pp = plotPos(p.plot);
-      const d = Math.hypot(pp.x + 0.5 - (cur.x + 0.5), pp.y + 0.5 - cur.y);
+      const d = Math.hypot(pp.x - cur.x, pp.y - cur.y);
       if (d < bestD) {
         best = p;
         bestD = d;
@@ -168,22 +217,27 @@ export function GardenMap({
     return best;
   }, [selected, meId, pos, plots]);
 
+  const myZone = meId ? benchZoneAt(layout, pos[meId].x, pos[meId].y) : null;
+
   function onMapClick(e: React.MouseEvent<SVGSVGElement>) {
     const svg = svgRef.current;
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
-    const x = Math.floor(((e.clientX - rect.left) / rect.width) * size.w);
-    const y = Math.floor(((e.clientY - rect.top) / rect.height) * size.h);
+    const x = Math.floor(((e.clientX - rect.left) / rect.width) * layout.w);
+    const y = Math.floor(((e.clientY - rect.top) / rect.height) * layout.h);
     const plot = plots.find((p) => {
       const pp = plotPos(p.plot);
       return x === pp.x && (y === pp.y || y === pp.y - 1);
     });
     if (plot && !meId) return setSelected(plot.id);
-    if (meId) setTarget(clamp(x, y));
+    if (!meId) return;
+    // Bấm vào ô đất: đi tới ô ngay dưới ô đất đó
+    const target = plot ? { x, y: plotPos(plot.plot).y + 1 } : { x, y };
+    setPath(findPath(pos[meId], target, layout, blocked));
   }
 
-  const W = size.w * TILE;
-  const H = size.h * TILE;
+  const W = layout.w * TILE;
+  const H = layout.h * TILE;
 
   return (
     <div className="space-y-3">
@@ -206,6 +260,10 @@ export function GardenMap({
               <circle cx={2} cy={2} r={0.8} fill="#6f4e2f" />
               <circle cx={6} cy={5} r={0.7} fill="#a07650" />
             </pattern>
+            <pattern id="paving" width={16} height={16} patternUnits="userSpaceOnUse">
+              <rect width={16} height={16} fill="#d6d0c4" />
+              <path d="M0 8 H16 M8 0 V8 M0 16 M4 8 V16 M12 8 V16" stroke="#bdb6a8" strokeWidth={1} />
+            </pattern>
           </defs>
           <rect width={W} height={H} fill="url(#grass)" />
           {/* Hàng rào */}
@@ -218,8 +276,28 @@ export function GardenMap({
               Vườn lớp {className}
             </text>
           </g>
-          {/* Ao nhỏ trang trí */}
-          <ellipse cx={W - TILE * 3} cy={H - TILE * 1.8} rx={TILE * 1.8} ry={TILE * 0.8} fill="#60a5fa" stroke="#3b82f6" strokeWidth={2} />
+          {/* Khu ghế đá */}
+          {layout.benchZones.map((b, i) => (
+            <g key={b.id}>
+              <rect x={b.zone.x * TILE} y={b.zone.y * TILE} width={b.zone.w * TILE} height={b.zone.h * TILE} rx={14} fill="url(#paving)" stroke="#bdb6a8" strokeWidth={2} />
+              <text x={(b.zone.x + b.zone.w / 2) * TILE} y={(b.zone.y + b.zone.h / 2) * TILE + 4} textAnchor="middle" fontSize={10} fill="#78716c">
+                Ghế đá {i + 1}
+              </text>
+              {b.benches.map((bench, j) => (
+                <Bench key={j} x={bench.x} y={bench.y} w={bench.w} />
+              ))}
+            </g>
+          ))}
+          {/* Ao */}
+          <ellipse
+            cx={(layout.pond.x + layout.pond.w / 2) * TILE}
+            cy={(layout.pond.y + layout.pond.h / 2) * TILE}
+            rx={(layout.pond.w / 2) * TILE}
+            ry={(layout.pond.h / 2) * TILE}
+            fill="#60a5fa"
+            stroke="#3b82f6"
+            strokeWidth={2}
+          />
 
           {/* Ô đất và cây */}
           {plots.map((p) => {
@@ -263,12 +341,20 @@ export function GardenMap({
               </g>
             );
           })}
+
+          {/* Cây cổ thụ vẽ sau cùng để tán che lên nhân vật đi phía sau */}
+          {layout.oldTrees.map((t, i) => (
+            <OldTree key={i} x={t.x} y={t.y} />
+          ))}
         </svg>
       </div>
 
       {meId && (
         <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-slate-500">Dùng phím mũi tên / W A S D, hoặc chạm vào bản đồ để đi. Đứng cạnh ô đất để xem cây.</p>
+          <p className="text-xs text-slate-500">
+            Dùng phím mũi tên / W A S D, hoặc chạm vào bản đồ để đi. Đứng cạnh ô đất để xem cây.
+            {myZone && <span className="ml-1 font-medium text-stone-600">Em đang ở khu ghế đá.</span>}
+          </p>
           {/* Nút điều hướng cho điện thoại */}
           <div className="grid grid-cols-3 gap-1 sm:hidden" aria-label="Điều khiển nhân vật">
             <span />
@@ -289,15 +375,15 @@ export function GardenMap({
         </div>
       )}
 
-      <PlotInfo plot={nearby} mine={!!me && nearby?.id === me.id} thresholds={thresholds} />
+      <PlotInfo plot={nearby} mine={!!me && nearby?.id === me.id} thresholds={thresholds} start={thresholds.gardenStart} />
     </div>
   );
 }
 
-function PlotInfo({ plot, mine, thresholds }: { plot: MapPlot | null; mine: boolean; thresholds: GardenThresholds }) {
-  if (!plot) return <div className="card text-sm text-slate-500">Đi tới cạnh một ô đất để xem cây của bạn đó.</div>;
+function PlotInfo({ plot, mine, thresholds, start }: { plot: MapPlot | null; mine: boolean; thresholds: GardenThresholds; start: number }) {
+  if (!plot) return <div className="card text-sm text-slate-500">Đi tới cạnh một ô đất để xem cây và điểm của bạn đó.</div>;
   const seed = plot.seed ? SEEDS[plot.seed] : null;
-  const next = plot.score != null ? nextGoal(plot.score, thresholds) : null;
+  const next = nextGoal(plot.score, thresholds);
   return (
     <div className="card" data-testid="plot-info">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -305,21 +391,30 @@ function PlotInfo({ plot, mine, thresholds }: { plot: MapPlot | null; mine: bool
           {mine ? "Cây của em" : `Cây của ${plot.name}`}
           {seed && <span className="ml-2 font-normal text-slate-500">· {seed.name}</span>}
         </div>
-        {plot.score != null && <span className="text-sm font-semibold text-teal-800">{plot.score} điểm vườn</span>}
+        <span className="text-sm font-semibold text-teal-800">{plot.score} điểm vườn</span>
       </div>
       {!seed ? (
         <p className="mt-1 text-sm text-slate-500">Chưa gieo hạt trong chu kỳ này.</p>
       ) : (
         <p className="mt-1 text-sm">
           <span className={`font-medium ${plot.state.wilt ? "text-amber-800" : "text-emerald-700"}`}>{plantLabel(plot.state, seed.fruitName)}</span>
-          {next && (
-            <span className="text-slate-500">
-              {" "}
-              · còn {next.need} điểm nữa để {next.goal}
-            </span>
-          )}
+          <span className="text-slate-500"> · còn {next.need} điểm nữa để {next.goal}</span>
           {plot.state.wilt > 0 && mine && <span className="text-slate-500"> · cố gắng tuần tới và làm việc tốt để cây tươi lại nhé!</span>}
         </p>
+      )}
+      <div className="mt-2 grid gap-1 text-xs text-slate-600 sm:grid-cols-3">
+        <span>Khởi đầu: {start}</span>
+        <span>Phiếu tuần đã duyệt: {signed(plot.fromSheets)}</span>
+        <span>Việc tốt: {signed(plot.fromDeeds)}</span>
+      </div>
+      {plot.deeds.length > 0 && (
+        <ul className="mt-2 space-y-0.5 text-xs text-emerald-800">
+          {plot.deeds.map((d, i) => (
+            <li key={i}>
+              ★ {d.helped ? `Được bạn giúp: ${d.title}` : d.title} ({signed(d.points)})
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

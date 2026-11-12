@@ -17,7 +17,7 @@ function harvestState(h: { leaves: number; fruits: number; wilt: number }): Plan
 
 export default async function StudentGardenPage() {
   const { student } = await requireStudent();
-  const { classroom, cycle, plots, size } = await loadGarden(student.classId);
+  const { classroom, cycle, plots, layout } = await loadGarden(student.classId);
   const mine = plots.find((p) => p.id === student.id);
   const harvests = await prisma.gardenHarvest.findMany({ where: { studentId: student.id }, orderBy: { createdAt: "desc" } });
 
@@ -52,10 +52,10 @@ export default async function StudentGardenPage() {
       <GardenMap
         classId={classroom.id}
         className={classroom.name}
-        // Điểm vườn là riêng tư: chỉ gửi điểm của chính em
-        plots={plots.map((p) => ({ ...p, score: p.id === student.id ? p.score : null }))}
+        // Cả lớp xem được điểm vườn và việc tốt của nhau (không có điểm trừ từng tuần, nhận xét của GV)
+        plots={plots}
         meId={student.id}
-        size={size}
+        layout={layout}
         thresholds={pickThresholds(classroom)}
       />
       {harvests.length > 0 && (
