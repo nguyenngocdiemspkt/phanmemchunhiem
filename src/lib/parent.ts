@@ -1,22 +1,28 @@
 import { randomBytes } from "crypto";
 import { headers } from "next/headers";
+import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 
 function newToken() {
   return randomBytes(18).toString("base64url");
 }
 
-/** Mã link phụ huynh cho các học sinh, tạo mới cho em nào chưa có. */
+/**
+ * Mã link phụ huynh cho các học sinh, tạo mới cho em nào chưa có.
+ * Cả lớp chỉ tốn 2 câu lệnh (không cập nhật từng em: trên Vercel mỗi lượt đi về Neon rất tốn thời gian).
+ */
 export async function ensureParentTokens(students: { id: string; parentToken: string | null }[]) {
   const map = new Map<string, string>();
-  for (const s of students) {
-    let token = s.parentToken;
-    if (!token) {
-      token = newToken();
-      await prisma.student.update({ where: { id: s.id }, data: { parentToken: token } });
-    }
-    map.set(s.id, token);
-  }
+  const missing = students.filter((s) => !s.parentToken);
+  for (const s of students) if (s.parentToken) map.set(s.id, s.parentToken);
+  if (missing.length === 0) return map;
+  // Chỉ ghi cho em vẫn chưa có mã (phòng hai trang cùng mở một lúc), rồi đọc lại mã thật đang lưu
+  await prisma.$executeRaw`
+    UPDATE "Student" AS s SET "parentToken" = v.token
+    FROM (VALUES ${Prisma.join(missing.map((s) => Prisma.sql`(${s.id}::text, ${newToken()}::text)`))}) AS v(id, token)
+    WHERE s."id" = v.id AND s."parentToken" IS NULL`;
+  const saved = await prisma.student.findMany({ where: { id: { in: missing.map((s) => s.id) } }, select: { id: true, parentToken: true } });
+  for (const s of saved) if (s.parentToken) map.set(s.id, s.parentToken);
   return map;
 }
 

@@ -1,7 +1,9 @@
 "use client";
 
 import { useActionState, useState, startTransition } from "react";
-import { saveCategoriesAction, saveGroupsAction, saveScoringSettingsAction } from "@/lib/emulationActions";
+import { saveCategoriesAction, saveGroupCriteriaAction, saveGroupsAction, saveScoringSettingsAction } from "@/lib/emulationActions";
+import type { GroupCriterionKind } from "@prisma/client";
+import { GROUP_KIND } from "@/lib/scoring";
 import { FormMessage } from "@/components/ui";
 
 const MAX_GROUPS = 12;
@@ -207,6 +209,80 @@ export function ScoringSettingsForm({
       <div className="flex items-center gap-3">
         <button className="btn-primary" disabled={pending}>
           {pending ? "Đang lưu..." : "Lưu cách tính điểm"}
+        </button>
+        <FormMessage state={state} />
+      </div>
+    </form>
+  );
+}
+
+type GroupCriterionRow = { id: string | null; name: string; kind: GroupCriterionKind; stars: number | ""; active: boolean };
+
+export function GroupCriteriaEditor({
+  classId,
+  initial,
+  starPoints,
+}: {
+  classId: string;
+  initial: GroupCriterionRow[];
+  starPoints: number;
+}) {
+  const [state, action, pending] = useActionState(saveGroupCriteriaAction.bind(null, classId), null);
+  const [rows, setRows] = useState<GroupCriterionRow[]>(initial);
+  const update = (i: number, patch: Partial<GroupCriterionRow>) => setRows(rows.map((r, k) => (k === i ? { ...r, ...patch } : r)));
+
+  return (
+    <form onSubmit={submitWithoutReset(action)} className="space-y-3">
+      <input type="hidden" name="criteria" value={JSON.stringify(rows)} />
+      <div>
+        <label className="label">Mỗi sao được quy ra</label>
+        <div className="flex items-center gap-2">
+          <input name="starPoints" type="number" min={0} max={1000} defaultValue={starPoints} className="input w-28" required />
+          <span className="text-sm text-slate-600">điểm, cộng vào tổng điểm thi đua của tổ</span>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {rows.map((r, i) => (
+          <div key={i} className={`grid gap-2 rounded-lg border border-slate-200 p-2 sm:grid-cols-[1fr_15rem_6rem_auto_auto] ${r.active ? "" : "opacity-60"}`}>
+            <input className="input" value={r.name} placeholder="Tên tiêu chí" onChange={(e) => update(i, { name: e.target.value })} />
+            <select className="input" value={r.kind} onChange={(e) => update(i, { kind: e.target.value as GroupCriterionKind })} title={GROUP_KIND[r.kind].hint}>
+              {(Object.keys(GROUP_KIND) as GroupCriterionKind[]).map((k) => (
+                <option key={k} value={k}>
+                  {GROUP_KIND[k].label}
+                </option>
+              ))}
+            </select>
+            <input
+              type="number"
+              step={1}
+              min={-10}
+              max={10}
+              className="input text-right font-semibold"
+              value={r.stars}
+              aria-label="Số sao"
+              title="Số sao (âm = trừ sao)"
+              onChange={(e) => update(i, { stars: e.target.value === "" ? "" : Number(e.target.value) })}
+            />
+            <label className="flex items-center gap-1 text-sm">
+              <input type="checkbox" checked={r.active} onChange={(e) => update(i, { active: e.target.checked })} /> Dùng
+            </label>
+            <button type="button" className="btn-danger btn-sm" onClick={() => setRows(rows.filter((_, k) => k !== i))}>
+              Xóa
+            </button>
+            <p className="text-xs text-slate-500 sm:col-span-5">{GROUP_KIND[r.kind].hint}</p>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() => setRows([...rows, { id: null, name: "", kind: "MANUAL", stars: 1, active: true }])}
+        >
+          + Thêm tiêu chí
+        </button>
+        <button className="btn-primary" disabled={pending}>
+          {pending ? "Đang lưu..." : "Lưu tiêu chí xếp hạng tổ"}
         </button>
         <FormMessage state={state} />
       </div>

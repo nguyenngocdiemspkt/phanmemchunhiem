@@ -12,6 +12,8 @@ export function ClassTabs({ classId }: { classId: string }) {
     { href: `${base}/to`, label: "Tổ" },
     { href: `${base}/dot`, label: "Đợt tự đánh giá" },
     { href: `${base}/thi-dua`, label: "Thi đua tổ" },
+    { href: `${base}/viec-tot`, label: "Việc tốt" },
+    { href: `${base}/vuon`, label: "Vườn lớp" },
   ];
   const active = items.find((i) => i.href !== base && pathname.startsWith(i.href))?.href ?? base;
   return <Tabs items={items} active={active} />;

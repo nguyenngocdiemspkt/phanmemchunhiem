@@ -20,11 +20,14 @@ export const getCurrentUser = cache(async () => {
 
 export type CurrentUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
 
-/** Bắt buộc đăng nhập (và đúng vai trò). Luôn kiểm tra lại trong DB, không chỉ tin cookie. */
-export async function requireUser(roles?: Role[], opts?: { allowMustChange?: boolean }) {
+/**
+ * Bắt buộc đăng nhập (và đúng vai trò). Luôn kiểm tra lại trong DB, không chỉ tin cookie.
+ * Tài khoản đang dùng mật khẩu được cấp (mustChangePassword) vẫn dùng bình thường;
+ * giao diện chỉ nhắc đổi mật khẩu, không bắt buộc.
+ */
+export async function requireUser(roles?: Role[], _opts?: { allowMustChange?: boolean }) {
   const user = await getCurrentUser();
   if (!user) redirect("/dang-nhap");
-  if (user.mustChangePassword && !opts?.allowMustChange) redirect("/doi-mat-khau");
   if (roles && !roles.includes(user.role)) redirect("/");
   return user;
 }

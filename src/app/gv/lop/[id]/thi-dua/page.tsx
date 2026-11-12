@@ -13,7 +13,7 @@ export default async function ClassEmulationPage({
   const { id } = await params;
   const { user, classroom, level } = await requireEmulationAccess(id);
   const week = weekRange((await searchParams).tuan);
-  const data = await loadEmulationBoard(id, classroom.groupCount, week, classroom.groupNames);
+  const data = await loadEmulationBoard(classroom, week);
   const monitors = data.students.filter((s) => s.isMonitor);
 
   return (
@@ -24,7 +24,7 @@ export default async function ClassEmulationPage({
           {monitors.length ? `Cán sự được ghi điểm: ${monitors.map((m) => m.name).join(", ")}` : "Chưa chỉ định cán sự ghi điểm"}
         </p>
         <Link href={`/gv/lop/${id}/thi-dua/cai-dat`} className="btn-secondary btn-sm">
-          ⚙ Phân tổ, cán sự & danh mục
+          ⚙ Tiêu chí, xếp hạng tổ & cán sự
         </Link>
       </div>
       <EmulationBoard

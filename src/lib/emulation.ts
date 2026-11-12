@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "./db";
 import { requireUser } from "./auth";
 import { addDays, fmtShortDate, toDateInput, weekStart } from "./format";
-import { groupName } from "./scoring";
+import { effectiveCounts, groupName, parseCounts, parseCriteria } from "./scoring";
+import { computeGroupStars, ensureGroupCriteria, weekKey, type StarHit } from "./groupRanking";
 
 export const MAX_GROUPS = 12;
 
@@ -59,14 +60,24 @@ export async function ensureCategories(classId: string) {
 }
 
 /** sheets: tổng điểm phiếu tuần đã duyệt của thành viên; plus/minus: điểm ghi trực tiếp */
+/**
+ * sheets: tổng điểm phiếu tuần đã duyệt của thành viên; plus/minus: điểm ghi trực tiếp;
+ * stars: số sao từ tiêu chí xếp hạng tổ, quy ra starScore = stars × số điểm mỗi sao.
+ */
 export type GroupStanding = {
   groupNo: number;
   name: string;
   members: number;
   sheets: number;
   sheetCount: number;
+  /** Điểm việc tốt đã duyệt của thành viên (người làm + người được hỗ trợ) */
+  deeds: number;
   plus: number;
   minus: number;
+  stars: number;
+  starScore: number;
+  /** Tiêu chí tổ đạt (chỉ có ở bảng tuần) */
+  hits: StarHit[];
   total: number;
   rank: number;
 };
@@ -78,7 +89,9 @@ function rankGroups(
   groupNames: unknown,
   records: { groupNo: number; points: number }[],
   sheets: SheetPoints[],
+  deeds: SheetPoints[],
   members: Map<number, number>,
+  stars: { byGroup: Map<number, StarHit[]>; starPoints: number; showHits: boolean },
 ): GroupStanding[] {
   const rows: GroupStanding[] = Array.from({ length: groupCount }, (_, i) => ({
     groupNo: i + 1,
@@ -86,8 +99,12 @@ function rankGroups(
     members: members.get(i + 1) ?? 0,
     sheets: 0,
     sheetCount: 0,
+    deeds: 0,
     plus: 0,
     minus: 0,
+    stars: 0,
+    starScore: 0,
+    hits: [],
     total: 0,
     rank: 0,
   }));
@@ -98,12 +115,28 @@ function rankGroups(
     row.sheetCount++;
     row.total += sh.points;
   }
+  for (const d of deeds) {
+    const row = d.groupNo ? rows[d.groupNo - 1] : undefined;
+    if (!row) continue;
+    row.deeds += d.points;
+    row.total += d.points;
+  }
   for (const r of records) {
     const row = rows[r.groupNo - 1];
     if (!row) continue;
     if (r.points > 0) row.plus += r.points;
     else row.minus += r.points;
     row.total += r.points;
+  }
+  for (const [groupNo, hits] of stars.byGroup) {
+    const row = rows[groupNo - 1];
+    if (!row) continue;
+    row.stars += hits.reduce((s, h) => s + h.stars, 0);
+    if (stars.showHits) row.hits.push(...hits);
+  }
+  for (const row of rows) {
+    row.starScore = row.stars * stars.starPoints;
+    row.total += row.starScore;
   }
   // Bằng điểm thì đồng hạng
   for (const row of rows) row.rank = 1 + rows.filter((o) => o.total > row.total).length;
@@ -114,13 +147,12 @@ const CHART_WEEKS = 8;
 
 /** Toàn bộ dữ liệu cho bảng thi đua của một lớp trong một tuần. */
 export async function loadEmulationBoard(
-  classId: string,
-  groupCount: number,
+  classroom: { id: string; groupCount: number; groupNames: unknown; ratingGood: number; starPoints: number },
   week: { start: Date; end: Date },
-  groupNames: unknown = null,
 ) {
+  const { id: classId, groupCount, groupNames } = classroom;
   const chartFrom = addDays(week.start, -7 * (CHART_WEEKS - 1));
-  const [allRecords, weekRecords, students, categories, approved] = await Promise.all([
+  const [allRecords, weekRecords, students, categories, approved, acceptedReports, scoringSurveys, groupCriteria, awards, approvedDeeds] = await Promise.all([
     prisma.emulationRecord.findMany({ where: { classId }, select: { groupNo: true, points: true, date: true } }),
     prisma.emulationRecord.findMany({
       where: { classId, date: { gte: week.start, lt: week.end } },
@@ -132,18 +164,48 @@ export async function loadEmulationBoard(
     }),
     prisma.student.findMany({
       where: { classId, user: { active: true } },
-      select: { id: true, groupNo: true, isMonitor: true, user: { select: { fullName: true } } },
+      select: { id: true, groupNo: true, isMonitor: true, status: true, user: { select: { fullName: true } } },
     }),
     ensureCategories(classId),
     // Phiếu tuần đã duyệt có điểm thi đua; tính vào tổ hiện tại của học sinh, theo tuần mở đợt
     prisma.response.findMany({
       where: { status: "APPROVED", points: { not: null }, survey: { classId } },
-      select: { points: true, student: { select: { groupNo: true, classId: true } }, survey: { select: { openAt: true } } },
+      select: {
+        surveyId: true,
+        studentId: true,
+        points: true,
+        selfCounts: true,
+        teacherCounts: true,
+        student: { select: { groupNo: true, classId: true } },
+        survey: { select: { openAt: true, criteria: true } },
+      },
+    }),
+    prisma.scoreReport.findMany({
+      where: { status: "ACCEPTED", criterionId: { not: null }, survey: { classId } },
+      select: { surveyId: true, studentId: true, criterionId: true, times: true },
+    }),
+    prisma.survey.findMany({ where: { classId, baseScore: { not: null } }, select: { openAt: true, criteria: true } }),
+    ensureGroupCriteria(classId),
+    prisma.groupAward.findMany({ where: { classId }, select: { criterionId: true, groupNo: true, weekStart: true, name: true, stars: true } }),
+    prisma.goodDeed.findMany({
+      where: { classId, status: "APPROVED", reviewedAt: { not: null } },
+      select: {
+        reviewedAt: true,
+        authorPoints: true,
+        beneficiaryPoints: true,
+        author: { select: { groupNo: true, classId: true } },
+        beneficiary: { select: { groupNo: true, classId: true } },
+      },
     }),
   ]);
-  const sheets: SheetPoints[] = approved
-    .filter((r) => r.student.classId === classId)
-    .map((r) => ({ groupNo: r.student.groupNo, points: r.points!, date: r.survey.openAt }));
+  // Việc tốt: điểm vào tổ hiện tại của người làm và người được hỗ trợ, theo tuần GV duyệt
+  const deeds: SheetPoints[] = approvedDeeds.flatMap((d) => [
+    ...(d.author.classId === classId && d.authorPoints ? [{ groupNo: d.author.groupNo, points: d.authorPoints, date: d.reviewedAt! }] : []),
+    ...(d.beneficiary?.classId === classId && d.beneficiaryPoints ? [{ groupNo: d.beneficiary.groupNo, points: d.beneficiaryPoints, date: d.reviewedAt! }] : []),
+  ]);
+  const weekDeeds = deeds.filter((x) => x.date >= week.start && x.date < week.end);
+  const own = approved.filter((r) => r.student.classId === classId);
+  const sheets: SheetPoints[] = own.map((r) => ({ groupNo: r.student.groupNo, points: r.points!, date: r.survey.openAt }));
   const weekSheets = sheets.filter((x) => x.date >= week.start && x.date < week.end);
 
   const lastWord = (s: string) => s.trim().split(/\s+/).at(-1) ?? s;
@@ -156,25 +218,79 @@ export async function loadEmulationBoard(
   const members = new Map<number, number>();
   for (const s of students) if (s.groupNo) members.set(s.groupNo, (members.get(s.groupNo) ?? 0) + 1);
 
-  // Biểu đồ: tổng điểm từng tuần của mỗi tổ, CHART_WEEKS tuần gần nhất tính đến tuần đang xem
+  // Sao của các tổ theo từng tuần, từ tiêu chí xếp hạng tổ
+  const memberIds = new Map<number, string[]>();
+  for (let g = 1; g <= groupCount; g++) {
+    memberIds.set(g, students.filter((s) => s.groupNo === g && s.status === "ACTIVE").map((s) => s.id));
+  }
+  const weekStars = computeGroupStars({
+    criteria: groupCriteria,
+    scoringWeeks: new Set(scoringSurveys.filter((s) => parseCriteria(s.criteria).length > 0).map((s) => weekKey(s.openAt))),
+    members: memberIds,
+    sheets: own.map((r) => {
+      const criteria = parseCriteria(r.survey.criteria);
+      const counts = effectiveCounts(
+        criteria,
+        parseCounts(r.selfCounts),
+        r.teacherCounts == null ? null : parseCounts(r.teacherCounts),
+        acceptedReports.filter((a) => a.surveyId === r.surveyId && a.studentId === r.studentId),
+      );
+      return {
+        studentId: r.studentId,
+        groupNo: r.student.groupNo,
+        week: weekKey(r.survey.openAt),
+        points: r.points!,
+        violation: criteria.some((c) => c.points < 0 && (counts[c.id] ?? 0) > 0),
+      };
+    }),
+    penalties: allRecords.filter((r) => r.points < 0).map((r) => ({ groupNo: r.groupNo, week: weekKey(r.date) })),
+    awards: awards.map((a) => ({ groupNo: a.groupNo, week: a.weekStart.getTime(), name: a.name, stars: a.stars })),
+    ratingGood: classroom.ratingGood,
+  });
+  const thisWeek = week.start.getTime();
+  const allStars = new Map<number, StarHit[]>();
+  for (const byGroup of weekStars.values()) {
+    for (const [g, hits] of byGroup) allStars.set(g, [...(allStars.get(g) ?? []), ...hits]);
+  }
+
+  // Biểu đồ: tổng điểm từng tuần của mỗi tổ (gồm điểm sao), CHART_WEEKS tuần gần nhất tính đến tuần đang xem
   const chart = Array.from({ length: CHART_WEEKS }, (_, i) => {
     const start = addDays(chartFrom, 7 * i);
     const row: Record<string, string | number> = { label: fmtShortDate(start) };
     for (let g = 1; g <= groupCount; g++) row[`g${g}`] = 0;
     return { start, end: addDays(start, 7), row };
   });
-  for (const r of [...allRecords, ...sheets]) {
+  const starEntries = [...weekStars].flatMap(([w, byGroup]) =>
+    [...byGroup].map(([g, hits]) => ({
+      groupNo: g,
+      date: new Date(w),
+      points: hits.reduce((s, h) => s + h.stars, 0) * classroom.starPoints,
+    })),
+  );
+  for (const r of [...allRecords, ...sheets, ...deeds, ...starEntries]) {
     if (!r.groupNo || r.groupNo > groupCount) continue;
     const bucket = chart.find((c) => r.date >= c.start && r.date < c.end);
     if (bucket) bucket.row[`g${r.groupNo}`] = (bucket.row[`g${r.groupNo}`] as number) + r.points;
   }
 
+  const manualCriteria = groupCriteria.filter((c) => c.active && c.kind === "MANUAL");
   return {
-    weekly: rankGroups(groupCount, groupNames, weekRecords, weekSheets, members),
-    overall: rankGroups(groupCount, groupNames, allRecords, sheets, members),
+    weekly: rankGroups(groupCount, groupNames, weekRecords, weekSheets, weekDeeds, members, {
+      byGroup: weekStars.get(thisWeek) ?? new Map(),
+      starPoints: classroom.starPoints,
+      showHits: true,
+    }),
+    overall: rankGroups(groupCount, groupNames, allRecords, sheets, deeds, members, {
+      byGroup: allStars,
+      starPoints: classroom.starPoints,
+      showHits: false,
+    }),
     chart: chart.map((c) => c.row),
-    hasChartData: [...allRecords, ...sheets].some((r) => r.date >= chartFrom && r.date < week.end),
+    hasChartData: [...allRecords, ...sheets, ...deeds, ...starEntries].some((r) => r.date >= chartFrom && r.date < week.end),
     groupNames: Array.from({ length: groupCount }, (_, i) => groupName(groupNames, i + 1)),
+    starPoints: classroom.starPoints,
+    manualCriteria: manualCriteria.map((c) => ({ id: c.id, name: c.name, stars: c.stars })),
+    weekAwards: awards.filter((a) => a.weekStart.getTime() === thisWeek).map((a) => ({ criterionId: a.criterionId, groupNo: a.groupNo })),
     records: weekRecords,
     students: students.map((s) => ({ id: s.id, name: s.user.fullName, groupNo: s.groupNo, isMonitor: s.isMonitor })),
     categories: categories.map((c) => ({ id: c.id, name: c.name, points: c.points })),

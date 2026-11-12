@@ -2,17 +2,19 @@ import Link from "next/link";
 import { requireClassAccess } from "@/lib/auth";
 import { ensureCategories } from "@/lib/emulation";
 import { prisma } from "@/lib/db";
-import { CategoryEditor, GroupsForm, ScoringSettingsForm } from "./SettingsForms";
+import { CategoryEditor, GroupCriteriaEditor, GroupsForm, ScoringSettingsForm } from "./SettingsForms";
+import { ensureGroupCriteria } from "@/lib/groupRanking";
 
 export default async function EmulationSettingsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { classroom } = await requireClassAccess(id);
-  const [students, categories] = await Promise.all([
+  const [students, categories, groupCriteria] = await Promise.all([
     prisma.student.findMany({
       where: { classId: id },
       select: { id: true, groupNo: true, isMonitor: true, user: { select: { fullName: true, active: true } } },
     }),
     ensureCategories(id),
+    ensureGroupCriteria(id),
   ]);
   const lastWord = (s: string) => s.trim().split(/\s+/).at(-1) ?? s;
   students.sort(
@@ -61,6 +63,19 @@ export default async function EmulationSettingsPage({ params }: { params: Promis
         <ScoringSettingsForm
           classId={id}
           initial={{ baseScore: classroom.baseScore, ratingGood: classroom.ratingGood, ratingFair: classroom.ratingFair, ratingPass: classroom.ratingPass }}
+        />
+      </div>
+
+      <div className="card">
+        <h2 className="mb-1 font-semibold">Tiêu chí xếp hạng tổ (sao)</h2>
+        <p className="mb-4 text-sm text-slate-500">
+          Mỗi tuần, tổ đạt tiêu chí được cộng sao (số âm là trừ sao). Sao được quy ra điểm và cộng vào tổng điểm của tổ, cùng với điểm tự
+          đánh giá đã duyệt của các thành viên. Tiêu chí tự động được tính từ phiếu đã duyệt; tiêu chí chấm tay thầy/cô tick ở bảng thi đua.
+        </p>
+        <GroupCriteriaEditor
+          classId={id}
+          starPoints={classroom.starPoints}
+          initial={groupCriteria.map((c) => ({ id: c.id, name: c.name, kind: c.kind, stars: c.stars, active: c.active }))}
         />
       </div>
 
