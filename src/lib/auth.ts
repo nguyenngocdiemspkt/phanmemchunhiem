@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { randomInt } from "crypto";
@@ -61,7 +61,8 @@ export async function createSession(user: { id: string; role: Role }) {
   const token = await signSession({ uid: user.id, role: user.role });
   (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    // Chỉ bật Secure khi trang chạy HTTPS (trình duyệt bỏ cookie Secure trên HTTP, vd server mới chưa có SSL)
+    secure: process.env.NODE_ENV === "production" && (await headers()).get("x-forwarded-proto") !== "http",
     sameSite: "lax",
     path: "/",
     maxAge: SESSION_MAX_AGE,

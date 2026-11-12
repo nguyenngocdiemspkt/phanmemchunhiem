@@ -8,6 +8,7 @@ import { PasswordReminder } from "./PasswordReminder";
 const NAV: Record<Role, { href: string; label: string }[]> = {
   ADMIN: [
     { href: "/admin", label: "Tổng quan" },
+    { href: "/gv", label: "Lớp chủ nhiệm" },
     { href: "/admin/giao-vien", label: "Giáo viên" },
     { href: "/admin/nam-hoc", label: "Năm học" },
     { href: "/admin/lop", label: "Lớp học" },
@@ -26,6 +27,7 @@ const NAV: Record<Role, { href: string; label: string }[]> = {
     { href: "/hs/hanh-trinh", label: "Hành trình" },
     { href: "/hs/vuon", label: "Vườn lớp" },
     { href: "/hs/viec-tot", label: "Việc tốt" },
+    { href: "/hs/binh-chon", label: "Bình chọn" },
     { href: "/hs/thi-dua", label: "Thi đua" },
     { href: "/hs/ca-nhan", label: "Cá nhân" },
     { href: "/hs/de-xuat", label: "Đề xuất" },

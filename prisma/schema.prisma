@@ -113,6 +113,7 @@ model Classroom {
   groupAwards         GroupAward[]
   goodDeeds           GoodDeed[]
   harvests            GardenHarvest[]
+  polls               Poll[]
   transfersIn         ClassTransfer[]     @relation("TransferTo")
 
   @@unique([name, schoolYear])
@@ -161,6 +162,7 @@ model Student {
   deedsReceived    GoodDeed[]        @relation("DeedBeneficiary")
   harvests         GardenHarvest[]
   featureRequests  FeatureRequest[]
+  pollVotes        PollVote[]
   notes            Note[]
   emulationRecords EmulationRecord[]
 
@@ -533,4 +535,48 @@ model FeatureRequest {
   updatedAt   DateTime             @updatedAt
 
   @@index([status, createdAt])
+}
+
+/// Cuộc bình chọn của lớp do GVCN tạo; mỗi học sinh chọn 1 phương án
+model Poll {
+  id          String    @id @default(cuid())
+  classId     String
+  classroom   Classroom @relation(fields: [classId], references: [id], onDelete: Cascade)
+  authorId    String?
+  question    String
+  description String?
+  startAt     DateTime
+  endAt       DateTime
+  /// GV đóng sớm trước endAt
+  closedAt    DateTime?
+  createdAt   DateTime  @default(now())
+
+  options PollOption[]
+  votes   PollVote[]
+
+  @@index([classId, startAt])
+}
+
+model PollOption {
+  id        String     @id @default(cuid())
+  pollId    String
+  poll      Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  text      String
+  sortOrder Int        @default(0)
+  votes     PollVote[]
+}
+
+/// Lựa chọn của học sinh; GV thấy tên, học sinh khác chỉ thấy số lượng
+model PollVote {
+  id        String     @id @default(cuid())
+  pollId    String
+  poll      Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  optionId  String
+  option    PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  studentId String
+  student   Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([pollId, studentId])
 }
