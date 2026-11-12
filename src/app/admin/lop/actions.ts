@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { audit } from "@/lib/audit";
+import { getGardenPreset } from "@/lib/gardenPreset";
 
 export type ClassFormState = { error?: string; ok?: string } | null;
 
@@ -31,7 +32,8 @@ export async function createClassAction(_prev: ClassFormState, formData: FormDat
     return { error: `Lớp ${name} năm học ${schoolYear} đã tồn tại.` };
   }
   const teacher = await validTeacher(formData.get("teacherId"));
-  const classroom = await prisma.classroom.create({ data: { name, schoolYear, homeroomTeacherId: teacher?.id ?? null } });
+  // Vườn lớp dùng bộ chuẩn của hệ thống; GVCN chỉnh riêng sau nếu muốn
+  const classroom = await prisma.classroom.create({ data: { name, schoolYear, homeroomTeacherId: teacher?.id ?? null, ...(await getGardenPreset()) } });
   await audit(user, "class.create", {
     entity: "Classroom",
     entityId: classroom.id,

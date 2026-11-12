@@ -27,7 +27,7 @@ function RankTable({
   ownGroup?: number | null;
   starPoints: number;
 }) {
-  const anyPoints = rows.some((r) => r.plus || r.minus || r.sheetCount || r.stars);
+  const anyPoints = rows.some((r) => r.plus || r.minus || r.sheetCount || r.stars || r.deeds);
   return (
     <div className="card overflow-x-auto">
       <h2 className="font-semibold">{title}</h2>
@@ -38,6 +38,7 @@ function RankTable({
             <th className="w-16">Hạng</th>
             <th>Tổ</th>
             <th className="text-right" title="Tổng điểm các phiếu tuần đã duyệt của thành viên">Phiếu tuần</th>
+            <th className="text-right" title="Điểm phiếu việc tốt đã duyệt (người làm và người được hỗ trợ)">Việc tốt</th>
             <th className="text-right" title="Điểm GV/cán sự ghi trực tiếp">Ghi thêm</th>
             <th className="text-right" title={`Sao từ tiêu chí xếp hạng tổ, 1 sao = ${starPoints} điểm`}>Sao</th>
             <th className="text-right">Tổng</th>
@@ -75,6 +76,7 @@ function RankTable({
                   <span className="text-slate-400">—</span>
                 )}
               </td>
+              <td className="text-right">{r.deeds ? <Points value={r.deeds} /> : <span className="text-slate-400">—</span>}</td>
               <td className="text-right">
                 {r.plus || r.minus ? <Points value={r.plus + r.minus} /> : <span className="text-slate-400">—</span>}
               </td>

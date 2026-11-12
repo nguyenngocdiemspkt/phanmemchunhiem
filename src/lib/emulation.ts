@@ -70,6 +70,8 @@ export type GroupStanding = {
   members: number;
   sheets: number;
   sheetCount: number;
+  /** Điểm việc tốt đã duyệt của thành viên (người làm + người được hỗ trợ) */
+  deeds: number;
   plus: number;
   minus: number;
   stars: number;
@@ -87,6 +89,7 @@ function rankGroups(
   groupNames: unknown,
   records: { groupNo: number; points: number }[],
   sheets: SheetPoints[],
+  deeds: SheetPoints[],
   members: Map<number, number>,
   stars: { byGroup: Map<number, StarHit[]>; starPoints: number; showHits: boolean },
 ): GroupStanding[] {
@@ -96,6 +99,7 @@ function rankGroups(
     members: members.get(i + 1) ?? 0,
     sheets: 0,
     sheetCount: 0,
+    deeds: 0,
     plus: 0,
     minus: 0,
     stars: 0,
@@ -110,6 +114,12 @@ function rankGroups(
     row.sheets += sh.points;
     row.sheetCount++;
     row.total += sh.points;
+  }
+  for (const d of deeds) {
+    const row = d.groupNo ? rows[d.groupNo - 1] : undefined;
+    if (!row) continue;
+    row.deeds += d.points;
+    row.total += d.points;
   }
   for (const r of records) {
     const row = rows[r.groupNo - 1];
@@ -142,7 +152,7 @@ export async function loadEmulationBoard(
 ) {
   const { id: classId, groupCount, groupNames } = classroom;
   const chartFrom = addDays(week.start, -7 * (CHART_WEEKS - 1));
-  const [allRecords, weekRecords, students, categories, approved, acceptedReports, scoringSurveys, groupCriteria, awards] = await Promise.all([
+  const [allRecords, weekRecords, students, categories, approved, acceptedReports, scoringSurveys, groupCriteria, awards, approvedDeeds] = await Promise.all([
     prisma.emulationRecord.findMany({ where: { classId }, select: { groupNo: true, points: true, date: true } }),
     prisma.emulationRecord.findMany({
       where: { classId, date: { gte: week.start, lt: week.end } },
@@ -177,7 +187,23 @@ export async function loadEmulationBoard(
     prisma.survey.findMany({ where: { classId, baseScore: { not: null } }, select: { openAt: true, criteria: true } }),
     ensureGroupCriteria(classId),
     prisma.groupAward.findMany({ where: { classId }, select: { criterionId: true, groupNo: true, weekStart: true, name: true, stars: true } }),
+    prisma.goodDeed.findMany({
+      where: { classId, status: "APPROVED", reviewedAt: { not: null } },
+      select: {
+        reviewedAt: true,
+        authorPoints: true,
+        beneficiaryPoints: true,
+        author: { select: { groupNo: true, classId: true } },
+        beneficiary: { select: { groupNo: true, classId: true } },
+      },
+    }),
   ]);
+  // Việc tốt: điểm vào tổ hiện tại của người làm và người được hỗ trợ, theo tuần GV duyệt
+  const deeds: SheetPoints[] = approvedDeeds.flatMap((d) => [
+    ...(d.author.classId === classId && d.authorPoints ? [{ groupNo: d.author.groupNo, points: d.authorPoints, date: d.reviewedAt! }] : []),
+    ...(d.beneficiary?.classId === classId && d.beneficiaryPoints ? [{ groupNo: d.beneficiary.groupNo, points: d.beneficiaryPoints, date: d.reviewedAt! }] : []),
+  ]);
+  const weekDeeds = deeds.filter((x) => x.date >= week.start && x.date < week.end);
   const own = approved.filter((r) => r.student.classId === classId);
   const sheets: SheetPoints[] = own.map((r) => ({ groupNo: r.student.groupNo, points: r.points!, date: r.survey.openAt }));
   const weekSheets = sheets.filter((x) => x.date >= week.start && x.date < week.end);
@@ -241,7 +267,7 @@ export async function loadEmulationBoard(
       points: hits.reduce((s, h) => s + h.stars, 0) * classroom.starPoints,
     })),
   );
-  for (const r of [...allRecords, ...sheets, ...starEntries]) {
+  for (const r of [...allRecords, ...sheets, ...deeds, ...starEntries]) {
     if (!r.groupNo || r.groupNo > groupCount) continue;
     const bucket = chart.find((c) => r.date >= c.start && r.date < c.end);
     if (bucket) bucket.row[`g${r.groupNo}`] = (bucket.row[`g${r.groupNo}`] as number) + r.points;
@@ -249,18 +275,18 @@ export async function loadEmulationBoard(
 
   const manualCriteria = groupCriteria.filter((c) => c.active && c.kind === "MANUAL");
   return {
-    weekly: rankGroups(groupCount, groupNames, weekRecords, weekSheets, members, {
+    weekly: rankGroups(groupCount, groupNames, weekRecords, weekSheets, weekDeeds, members, {
       byGroup: weekStars.get(thisWeek) ?? new Map(),
       starPoints: classroom.starPoints,
       showHits: true,
     }),
-    overall: rankGroups(groupCount, groupNames, allRecords, sheets, members, {
+    overall: rankGroups(groupCount, groupNames, allRecords, sheets, deeds, members, {
       byGroup: allStars,
       starPoints: classroom.starPoints,
       showHits: false,
     }),
     chart: chart.map((c) => c.row),
-    hasChartData: [...allRecords, ...sheets, ...starEntries].some((r) => r.date >= chartFrom && r.date < week.end),
+    hasChartData: [...allRecords, ...sheets, ...deeds, ...starEntries].some((r) => r.date >= chartFrom && r.date < week.end),
     groupNames: Array.from({ length: groupCount }, (_, i) => groupName(groupNames, i + 1)),
     starPoints: classroom.starPoints,
     manualCriteria: manualCriteria.map((c) => ({ id: c.id, name: c.name, stars: c.stars })),

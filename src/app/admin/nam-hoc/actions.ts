@@ -7,6 +7,7 @@ import { audit } from "@/lib/audit";
 import { fmtDate, fromDateInput } from "@/lib/format";
 import { firstYearOf, validateYearDates } from "@/lib/schoolYear";
 import { enrollManyOps } from "@/lib/students";
+import { getGardenPreset } from "@/lib/gardenPreset";
 
 export type YearFormState = { error?: string; ok?: string } | null;
 
@@ -114,6 +115,7 @@ export async function copyClassesAction(yearId: string, _prev: CopyClassesState,
   const withStudents = formData.get("withStudents") === "on";
 
   const classes = await prisma.classroom.findMany({ where: { schoolYear: source.name }, orderBy: { name: "asc" } });
+  const gardenPreset = await getGardenPreset();
   const details: string[] = [];
   let created = 0;
   let moved = 0;
@@ -143,6 +145,8 @@ export async function copyClassesAction(yearId: string, _prev: CopyClassesState,
           ratingGood: c.ratingGood,
           ratingFair: c.ratingFair,
           ratingPass: c.ratingPass,
+          // Vườn lớp năm mới dùng bộ chuẩn hiện tại của hệ thống
+          ...gardenPreset,
         },
       }));
     if (exists) details.push(`${name} (${target.name}) đã có, dùng lại lớp này.`);

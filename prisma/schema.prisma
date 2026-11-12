@@ -69,25 +69,39 @@ model SchoolYear {
 }
 
 model Classroom {
-  id                String     @id @default(cuid())
+  id                String      @id @default(cuid())
   name              String
   schoolYear        String
-  year              SchoolYear @relation(fields: [schoolYear], references: [name], onUpdate: Cascade)
+  year              SchoolYear  @relation(fields: [schoolYear], references: [name], onUpdate: Cascade)
   homeroomTeacherId String?
-  homeroomTeacher   User?      @relation("Homeroom", fields: [homeroomTeacherId], references: [id], onDelete: SetNull)
+  homeroomTeacher   User?       @relation("Homeroom", fields: [homeroomTeacherId], references: [id], onDelete: SetNull)
   /// Số tổ của lớp, dùng cho thi đua
-  groupCount        Int        @default(4)
+  groupCount        Int         @default(4)
   /// Tên tổ do GV đặt: ["Tổ Ong vàng", ...] theo thứ tự tổ 1..groupCount; thiếu thì hiển thị "Tổ n"
   groupNames        Json?
   /// Điểm gốc mỗi tuần của mỗi học sinh khi chấm điểm theo tiêu chí
-  baseScore         Int        @default(100)
+  baseScore         Int         @default(100)
   /// Ngưỡng xếp loại tuần: >= ratingGood là Tốt, >= ratingFair là Khá, >= ratingPass là Đạt, còn lại Cần cố gắng
-  ratingGood        Int        @default(100)
-  ratingFair        Int        @default(95)
-  ratingPass        Int        @default(85)
+  ratingGood        Int         @default(100)
+  ratingFair        Int         @default(95)
+  ratingPass        Int         @default(85)
   /// Mỗi sao của tiêu chí xếp hạng tổ được quy ra bao nhiêu điểm
-  starPoints        Int        @default(10)
-  createdAt         DateTime   @default(now())
+  starPoints        Int         @default(10)
+  /// Khu vườn lớp: chu kỳ thu hoạch và mốc điểm nuôi cây của từng giai đoạn
+  gardenCycle       GardenCycle @default(SEMESTER)
+  /// Điểm vườn khởi đầu của mỗi học sinh (cây là hạt giống)
+  gardenStart       Int         @default(100)
+  /// Dưới gardenWilt: cây héo; dưới gardenDry: khô lá
+  gardenWilt        Int         @default(80)
+  gardenDry         Int         @default(70)
+  /// Từ gardenSprout: nảy mầm; từ gardenTwoLeaves: có 2 lá, sau đó mỗi gardenLeafStep điểm thêm 1 lá
+  gardenSprout      Int         @default(105)
+  gardenTwoLeaves   Int         @default(110)
+  gardenLeafStep    Int         @default(3)
+  /// Từ gardenMature: cây trưởng thành, ra trái; vượt mốc này mỗi gardenFruitStep điểm thêm 1 trái
+  gardenMature      Int         @default(140)
+  gardenFruitStep   Int         @default(5)
+  createdAt         DateTime    @default(now())
 
   students            Student[]
   surveys             Survey[]
@@ -97,6 +111,8 @@ model Classroom {
   enrollments         Enrollment[]
   groupCriteria       GroupCriterion[]
   groupAwards         GroupAward[]
+  goodDeeds           GoodDeed[]
+  harvests            GardenHarvest[]
   transfersIn         ClassTransfer[]     @relation("TransferTo")
 
   @@unique([name, schoolYear])
@@ -118,6 +134,15 @@ model Student {
   groupNo         Int?
   /// Cán sự lớp: được ghi điểm thi đua
   isMonitor       Boolean       @default(false)
+  /// Nhân vật trong vườn lớp: { skin, hair, hairColor, shirt, pants, acc }
+  character       Json?
+  /// Hạt giống đang trồng và chu kỳ của lần trồng (vd "2026-2027-HK1")
+  seedType        String?
+  seedCycle       String?
+  /// Vị trí nhân vật trên bản đồ vườn (ô lưới), cập nhật khi em di chuyển
+  posX            Int?
+  posY            Int?
+  posAt           DateTime?
   /// Tổ trưởng: được nhận xét và đề xuất bổ sung vi phạm cho tổ viên (GV xác nhận mới tính)
   isGroupLeader   Boolean       @default(false)
   /// Mã bí mật trong đường link phụ huynh xem kết quả (/ph/<mã>), không cần đăng nhập
@@ -132,6 +157,9 @@ model Student {
   responses        Response[]
   scoreReports     ScoreReport[]     @relation("ReportTarget")
   reportsMade      ScoreReport[]     @relation("ReportAuthor")
+  deedsDone        GoodDeed[]        @relation("DeedAuthor")
+  deedsReceived    GoodDeed[]        @relation("DeedBeneficiary")
+  harvests         GardenHarvest[]
   notes            Note[]
   emulationRecords EmulationRecord[]
 
@@ -319,6 +347,70 @@ model UserAvatar {
   updatedAt DateTime @updatedAt
 }
 
+enum GardenCycle {
+  SEMESTER // Thu hoạch mỗi học kỳ
+  YEAR // Thu hoạch cuối năm học
+}
+
+/// Kết quả một chu kỳ trồng cây của học sinh (ghi lại khi sang chu kỳ mới)
+model GardenHarvest {
+  id         String     @id @default(cuid())
+  studentId  String
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classId    String?
+  classroom  Classroom? @relation(fields: [classId], references: [id], onDelete: SetNull)
+  cycle      String
+  cycleLabel String
+  seedType   String
+  /// Điểm vườn cuối chu kỳ và hình dạng cây lúc thu hoạch
+  score      Int
+  leaves     Int
+  fruits     Int
+  wilt       Int
+  createdAt  DateTime   @default(now())
+
+  @@unique([studentId, cycle])
+}
+
+enum GoodDeedKind {
+  ONCE // Việc tốt một lần, áp dụng ngay
+  CHALLENGE // Thử thách có thời hạn
+}
+
+enum GoodDeedStatus {
+  ONGOING // Thử thách đang thực hiện
+  PENDING // Chờ GVCN duyệt
+  APPROVED
+  REJECTED
+}
+
+/// Phiếu việc tốt học sinh tự tạo; GVCN duyệt và cho điểm (người làm + người được hỗ trợ nếu có)
+model GoodDeed {
+  id                String         @id @default(cuid())
+  classId           String
+  classroom         Classroom      @relation(fields: [classId], references: [id], onDelete: Cascade)
+  authorId          String
+  author            Student        @relation("DeedAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  beneficiaryId     String?
+  beneficiary       Student?       @relation("DeedBeneficiary", fields: [beneficiaryId], references: [id], onDelete: SetNull)
+  title             String
+  description       String?
+  kind              GoodDeedKind
+  deadline          DateTime?
+  status            GoodDeedStatus
+  completedAt       DateTime?
+  authorPoints      Int?
+  beneficiaryPoints Int?
+  teacherNote       String?
+  reviewerId        String?
+  reviewedAt        DateTime?
+  createdAt         DateTime       @default(now())
+
+  @@index([classId, status])
+  @@index([authorId])
+  @@index([beneficiaryId])
+}
+
 enum GroupCriterionKind {
   NO_VIOLATION // Tự động: cả tổ không ai vi phạm trong tuần
   ALL_SUBMITTED // Tự động: mọi thành viên có phiếu tuần đã duyệt
@@ -408,4 +500,11 @@ model Enrollment {
 
   @@unique([studentId, schoolYear])
   @@index([classId])
+}
+
+/// Cấu hình chung của hệ thống (chỉ quản trị sửa), vd "garden": bộ tham số chuẩn cho vườn lớp của lớp mới
+model SystemSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
 }
