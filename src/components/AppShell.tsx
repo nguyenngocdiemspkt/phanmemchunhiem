@@ -5,6 +5,9 @@ import { NavLinks } from "./NavLinks";
 import { Avatar } from "./Avatar";
 import { PasswordReminder } from "./PasswordReminder";
 
+/** Trang hướng dẫn theo vai trò */
+const DOC_FOR: Record<Role, string> = { ADMIN: "/docs/admin", TEACHER: "/docs/giao-vien", STUDENT: "/docs/hoc-sinh" };
+
 const NAV: Record<Role, { href: string; label: string }[]> = {
   ADMIN: [
     { href: "/admin", label: "Tổng quan" },
@@ -52,6 +55,9 @@ export function AppShell({
           </Link>
           <NavLinks items={NAV[user.role]} />
           <div className="ml-auto flex items-center gap-3 text-sm">
+            <Link href={DOC_FOR[user.role]} className="text-slate-500 hover:text-teal-700" title="Hướng dẫn sử dụng">
+              ? Hướng dẫn
+            </Link>
             <Link href="/tai-khoan" className="flex items-center gap-2 rounded-lg px-1 py-0.5 hover:bg-slate-100" title="Tài khoản của tôi">
               <Avatar user={user} size={32} />
               <span className="hidden text-left sm:block">

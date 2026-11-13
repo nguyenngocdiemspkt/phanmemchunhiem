@@ -25,6 +25,11 @@ export function LoginForm() {
         {pending ? "Đang đăng nhập..." : "Đăng nhập"}
       </button>
       <p className="text-center text-xs text-slate-500">Quên mật khẩu? Hãy liên hệ giáo viên chủ nhiệm để được cấp lại.</p>
+      <p className="text-center text-xs">
+        <a href="/docs" className="text-teal-700 hover:underline">
+          Hướng dẫn sử dụng
+        </a>
+      </p>
     </form>
   );
 }
