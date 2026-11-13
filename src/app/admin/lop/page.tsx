@@ -3,9 +3,8 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { currentSchoolYear } from "@/lib/schoolYear";
 import { Badge, Empty, PageHeader } from "@/components/ui";
-import { SubmitButton } from "@/components/SubmitButton";
 import { CreateClassForm } from "./CreateClassForm";
-import { deleteClassAction, updateClassAction } from "./actions";
+import { ClassRow } from "./ClassRow";
 
 export default async function ClassesPage({ searchParams }: { searchParams: Promise<{ nam?: string }> }) {
   await requireUser(["ADMIN"]);
@@ -24,7 +23,7 @@ export default async function ClassesPage({ searchParams }: { searchParams: Prom
   const classes = await prisma.classroom.findMany({
     where: yearFilter ? { schoolYear: yearFilter } : undefined,
     orderBy: [{ schoolYear: "desc" }, { name: "asc" }],
-    include: { year: { select: { locked: true } }, _count: { select: { students: true, surveys: true, enrollments: true } } },
+    include: { year: { select: { locked: true } }, homeroomTeacher: { select: { fullName: true, active: true } }, _count: { select: { students: true, surveys: true, enrollments: true } } },
   });
   const openYears = years.filter((y) => !y.locked).map((y) => y.name);
 
@@ -72,7 +71,6 @@ export default async function ClassesPage({ searchParams }: { searchParams: Prom
             </thead>
             <tbody>
               {classes.map((c) => {
-                const formId = `class-${c.id}`;
                 if (c.year.locked) {
                   return (
                     <tr key={c.id} className="opacity-70">
@@ -80,7 +78,7 @@ export default async function ClassesPage({ searchParams }: { searchParams: Prom
                       <td>
                         {c.schoolYear} <Badge className="bg-slate-100 text-slate-600 ring-slate-200">Đã khóa</Badge>
                       </td>
-                      <td>{teachers.find((t) => t.id === c.homeroomTeacherId)?.fullName ?? "—"}</td>
+                      <td>{c.homeroomTeacher?.fullName ?? "—"}</td>
                       <td>
                         <Link href={`/gv/lop/${c.id}/hoc-sinh`} className="link">
                           {c._count.students} HS
@@ -91,48 +89,18 @@ export default async function ClassesPage({ searchParams }: { searchParams: Prom
                   );
                 }
                 return (
-                  <tr key={c.id}>
-                    <td>
-                      <form id={formId} action={updateClassAction.bind(null, c.id)} />
-                      <input form={formId} name="name" defaultValue={c.name} className="input w-28" required />
-                    </td>
-                    <td>
-                      <select form={formId} name="schoolYear" defaultValue={c.schoolYear} className="input w-32">
-                        {openYears.map((y) => (
-                          <option key={y}>{y}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      <select form={formId} name="teacherId" defaultValue={c.homeroomTeacherId ?? ""} className="input min-w-44">
-                        <option value="">— Chưa phân công —</option>
-                        {teachers.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.fullName}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      <Link href={`/gv/lop/${c.id}/hoc-sinh`} className="link">
-                        {c._count.students} HS
-                      </Link>
-                    </td>
-                    <td>
-                      <div className="flex gap-1">
-                        <button form={formId} className="btn-secondary btn-sm">
-                          Lưu
-                        </button>
-                        {c._count.students === 0 && c._count.surveys === 0 && c._count.enrollments === 0 && (
-                          <form action={deleteClassAction.bind(null, c.id)}>
-                            <SubmitButton className="btn-danger btn-sm" pendingText="..." confirm={`Xóa lớp ${c.name}?`}>
-                              Xóa
-                            </SubmitButton>
-                          </form>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                  <ClassRow
+                    key={c.id}
+                    id={c.id}
+                    name={c.name}
+                    schoolYear={c.schoolYear}
+                    teacherId={c.homeroomTeacherId}
+                    inactiveTeacher={c.homeroomTeacher && !c.homeroomTeacher.active ? c.homeroomTeacher.fullName : null}
+                    studentCount={c._count.students}
+                    canDelete={c._count.students === 0 && c._count.surveys === 0 && c._count.enrollments === 0}
+                    years={openYears}
+                    teachers={teachers}
+                  />
                 );
               })}
             </tbody>

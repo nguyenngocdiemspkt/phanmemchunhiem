@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
+import { submitKeep } from "@/lib/formSubmit";
 import type { FeatureRequestStatus } from "@prisma/client";
 import { createFeatureRequestAction, updateFeatureRequestAction } from "@/lib/featureRequestActions";
 import { FormMessage } from "./ui";
@@ -36,7 +37,7 @@ export function CreateFeatureRequestForm() {
 export function UpdateFeatureRequestForm({ id, status, adminNote }: { id: string; status: FeatureRequestStatus; adminNote: string | null }) {
   const [state, action, pending] = useActionState(updateFeatureRequestAction.bind(null, id), null);
   return (
-    <form action={action} className="mt-3 flex flex-wrap items-end gap-2">
+    <form key={`${status}|${adminNote}`} onSubmit={submitKeep(action)} className="mt-3 flex flex-wrap items-end gap-2">
       <select name="status" defaultValue={status} className="input w-auto" aria-label="Trạng thái">
         {(Object.keys(FEATURE_STATUS) as FeatureRequestStatus[]).map((s) => (
           <option key={s} value={s}>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
+import { submitKeep } from "@/lib/formSubmit";
 import { FormMessage } from "@/components/ui";
 import { addNoteAction, setStudentStatusAction, transferStudentAction, updateProfileAction } from "./actions";
 
@@ -24,7 +25,7 @@ export function ProfileForm({ studentId, profile }: { studentId: string; profile
     </div>
   );
   return (
-    <form action={action} className="grid gap-3 sm:grid-cols-2">
+    <form key={JSON.stringify(profile)} onSubmit={submitKeep(action)} className="grid gap-3 sm:grid-cols-2">
       {field("fullName", "Họ và tên")}
       {field("studentCode", "Mã học sinh")}
       {field("dateOfBirth", "Ngày sinh")}
@@ -89,7 +90,7 @@ export function AddNoteForm({ studentId, today }: { studentId: string; today: st
 export function StatusForm({ studentId, status }: { studentId: string; status: string }) {
   const [state, action, pending] = useActionState(setStudentStatusAction.bind(null, studentId), null);
   return (
-    <form action={action} className="grid gap-3 sm:grid-cols-[12rem_1fr_auto]">
+    <form key={status} onSubmit={submitKeep(action)} className="grid gap-3 sm:grid-cols-[12rem_1fr_auto]">
       <select name="status" className="input" defaultValue={status}>
         <option value="ACTIVE">Đang học</option>
         <option value="TRANSFERRED">Chuyển trường</option>

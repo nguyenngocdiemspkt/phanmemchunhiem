@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { startTransition, useActionState, useEffect } from "react";
+import { submitKeep } from "@/lib/formSubmit";
 import type { GardenThresholds } from "@/lib/garden";
 import type { GardenState } from "@/lib/gardenActions";
 import { FormMessage } from "@/components/ui";
@@ -40,7 +41,7 @@ export function GardenSettingsForm({
     if (resetState?.ok) window.location.reload();
   }, [resetState]);
   return (
-    <form action={action} className="space-y-4">
+    <form key={JSON.stringify(initial)} onSubmit={submitKeep(action)} className="space-y-4">
       <div>
         <label className="label">Thu hoạch (kết thúc một chu kỳ trồng cây)</label>
         <select name="gardenCycle" defaultValue={initial.gardenCycle} className="input w-auto">
@@ -72,13 +73,11 @@ export function GardenSettingsForm({
         </button>
         {reset && (
           <button
-            type="submit"
-            formAction={resetAction}
-            formNoValidate
+            type="button"
             className="btn-secondary"
             disabled={resetting}
-            onClick={(e) => {
-              if (!confirm("Đưa toàn bộ cài đặt vườn của lớp về bộ chuẩn của hệ thống?")) e.preventDefault();
+            onClick={() => {
+              if (confirm("Đưa toàn bộ cài đặt vườn của lớp về bộ chuẩn của hệ thống?")) startTransition(() => resetAction());
             }}
           >
             {resetting ? "Đang áp dụng..." : "Dùng lại bộ chuẩn của hệ thống"}

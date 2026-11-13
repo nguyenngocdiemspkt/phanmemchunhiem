@@ -44,24 +44,27 @@ export async function createClassAction(_prev: ClassFormState, formData: FormDat
   return { ok: `Đã tạo lớp ${name}.` };
 }
 
-export async function updateClassAction(classId: string, formData: FormData) {
+export async function updateClassAction(classId: string, formData: FormData): Promise<{ ok?: string; error?: string }> {
   const user = await requireUser(["ADMIN"]);
-  const before = await prisma.classroom.findUnique({ where: { id: classId }, include: { homeroomTeacher: true } });
-  if (!before) return;
+  const before = await prisma.classroom.findUnique({ where: { id: classId }, include: { homeroomTeacher: true, year: { select: { locked: true } } } });
+  if (!before) return { error: "Không tìm thấy lớp." };
+  if (before.year.locked) return { error: `Năm học ${before.schoolYear} đã khóa.` };
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) return;
+  if (!name) return { error: "Vui lòng nhập tên lớp." };
   const y = await openYear(formData.get("schoolYear"));
-  if ("error" in y) return;
+  if ("error" in y) return { error: y.error };
   const schoolYear = y.year.name;
   const dup = await prisma.classroom.findFirst({ where: { name, schoolYear, NOT: { id: classId } } });
-  if (dup) return;
-  const teacher = await validTeacher(formData.get("teacherId"));
+  if (dup) return { error: `Năm học ${schoolYear} đã có lớp ${name}.` };
+  const rawTeacher = String(formData.get("teacherId") ?? "");
+  const teacher = await validTeacher(rawTeacher);
+  if (rawTeacher && !teacher) return { error: "Giáo viên không hợp lệ." };
   if (before.schoolYear !== schoolYear) {
     // Đổi năm học của lớp: học sinh của lớp không được đang thuộc lớp khác trong năm học mới
     const conflict = await prisma.enrollment.count({
       where: { schoolYear, student: { enrollments: { some: { classId } } } },
     });
-    if (conflict > 0) return;
+    if (conflict > 0) return { error: `Có học sinh của lớp đã thuộc lớp khác trong năm học ${schoolYear}.` };
   }
   await prisma.$transaction([
     prisma.classroom.update({ where: { id: classId }, data: { name, schoolYear, homeroomTeacherId: teacher?.id ?? null } }),
@@ -83,6 +86,8 @@ export async function updateClassAction(classId: string, formData: FormData) {
     });
   }
   revalidatePath("/admin/lop");
+  revalidatePath("/admin/giao-vien");
+  return { ok: teacher ? `Đã lưu. GVCN: ${teacher.fullName}` : "Đã lưu." };
 }
 
 export async function deleteClassAction(classId: string) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { submitKeep } from "@/lib/formSubmit";
 import { FormMessage } from "@/components/ui";
 import { updateTeacherAction } from "./actions";
 
@@ -13,7 +14,8 @@ export function EditTeacherForm({
   return (
     <details>
       <summary className="btn-secondary btn-sm list-none">Sửa</summary>
-      <form action={action} className="mt-2 grid w-72 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+      {/* key: sau khi lưu, dựng lại form từ dữ liệu mới (React tự đặt lại form sau action, làm ô chọn hiện sai giá trị) */}
+      <form key={`${user.role}|${user.fullName}|${user.phone}|${user.email}`} onSubmit={submitKeep(action)} className="mt-2 grid w-72 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
         <input name="fullName" className="input" defaultValue={user.fullName} placeholder="Họ và tên" required />
         <input name="phone" className="input" defaultValue={user.phone ?? ""} placeholder="Số điện thoại" />
         <input name="email" type="email" className="input" defaultValue={user.email ?? ""} placeholder="Email" />
