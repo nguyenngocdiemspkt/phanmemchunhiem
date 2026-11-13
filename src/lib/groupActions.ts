@@ -79,19 +79,17 @@ export async function addMembersAction(classId: string, groupNo: number, _prev: 
   if (groupNo < 1 || groupNo > classroom.groupCount) return { error: "Tổ không hợp lệ." };
   const ids = [...new Set(formData.getAll("ids").map(String))];
   if (ids.length === 0) return { error: "Hãy chọn học sinh để thêm vào tổ." };
-  const students = await prisma.student.findMany({
+  const found = await prisma.student.findMany({
     where: { id: { in: ids }, classId },
     select: { id: true, groupNo: true, user: { select: { fullName: true } } },
   });
-  await prisma.$transaction(
-    students.map((s) =>
-      prisma.student.update({
-        where: { id: s.id },
-        // Chuyển từ tổ khác sang thì thôi làm tổ trưởng tổ cũ
-        data: { groupNo, ...(s.groupNo !== groupNo ? { isGroupLeader: false } : {}) },
-      }),
-    ),
-  );
+  // Chỉ thêm học sinh chưa có tổ (tổ đã bị xóa cũng tính là chưa có tổ); em đang ở tổ khác phải được đưa ra trước
+  const inGroup = found.filter((s) => s.groupNo != null && s.groupNo >= 1 && s.groupNo <= classroom.groupCount);
+  const students = found.filter((s) => !inGroup.includes(s));
+  if (students.length === 0) {
+    return { error: `${inGroup.map((s) => s.user.fullName).join(", ")} đã ở trong tổ. Hãy đưa ra khỏi tổ cũ trước.` };
+  }
+  await prisma.student.updateMany({ where: { id: { in: students.map((s) => s.id) } }, data: { groupNo, isGroupLeader: false } });
   const g = groupName(classroom.groupNames, groupNo);
   await audit(user, "class.group.members", {
     classId,
@@ -100,7 +98,9 @@ export async function addMembersAction(classId: string, groupNo: number, _prev: 
     summary: `Lớp ${classroom.name}: thêm ${students.map((s) => s.user.fullName).join(", ")} vào ${g}`,
   });
   revalidateGroups(classId);
-  return { ok: `Đã thêm ${students.length} học sinh vào ${g}.` };
+  return {
+    ok: `Đã thêm ${students.length} học sinh vào ${g}.${inGroup.length ? ` Bỏ qua ${inGroup.map((s) => s.user.fullName).join(", ")} (đã ở tổ khác).` : ""}`,
+  };
 }
 
 export async function removeMemberAction(classId: string, studentId: string) {

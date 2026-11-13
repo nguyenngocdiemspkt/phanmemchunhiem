@@ -41,11 +41,8 @@ export default async function GroupsPage({ params }: { params: Promise<{ id: str
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {groups.map((g) => {
           const members = students.filter((s) => s.groupNo === g);
-          const candidates = students
-            .filter((s) => s.groupNo !== g)
-            .map((s) => ({ id: s.id, name: s.user.fullName, from: s.groupNo && s.groupNo <= classroom.groupCount ? name(s.groupNo) : null }))
-            // Học sinh chưa có tổ lên đầu
-            .sort((a, b) => Number(!!a.from) - Number(!!b.from));
+          // Chỉ học sinh chưa có tổ; em đã ở tổ khác phải "Đưa ra" khỏi tổ đó trước
+          const candidates = unassigned.map((s) => ({ id: s.id, name: s.user.fullName }));
           return (
             <div key={g} className="card" style={{ borderTop: `4px solid ${GROUP_COLORS[(g - 1) % GROUP_COLORS.length]}` }}>
               {locked ? (

@@ -135,7 +135,8 @@ export default function TeacherDocs() {
             Thẻ <Path>Tổ</Path> › <B>+ Tạo tổ</B> (có thể đặt tên riêng, bỏ trống thì là &quot;Tổ 1, Tổ 2...&quot;).
           </li>
           <li>
-            Trong mỗi tổ bấm <B>+ Thêm học sinh</B>, tick các em rồi bấm <B>Thêm vào tổ</B>. Em đang ở tổ khác sẽ được chuyển sang.
+            Trong mỗi tổ bấm <B>+ Thêm học sinh</B>, tick các em rồi bấm <B>Thêm vào tổ</B>. Danh sách chỉ có các em <em>chưa có tổ</em>; em đã ở
+            tổ khác không hiện ở đây. Muốn chuyển một em sang tổ khác, bấm <B>Đưa ra</B> ở tổ cũ trước rồi thêm vào tổ mới.
           </li>
           <li>
             Bấm <B>Làm tổ trưởng</B> cạnh tên một em (bấm lại <B>Bỏ tổ trưởng</B> để bỏ). Mỗi tổ có thể có tổ trưởng riêng.

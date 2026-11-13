@@ -20,7 +20,7 @@ export function AddGroupForm({ classId, nextNo }: { classId: string; nextNo: num
   );
 }
 
-/** Chọn các học sinh chưa phân tổ (hoặc ở tổ khác) để đưa vào tổ */
+/** Chọn các học sinh chưa phân tổ để đưa vào tổ (em đã ở tổ khác không hiện ở đây) */
 export function AddMembersForm({
   classId,
   groupNo,
@@ -28,10 +28,16 @@ export function AddMembersForm({
 }: {
   classId: string;
   groupNo: number;
-  candidates: { id: string; name: string; from: string | null }[];
+  candidates: { id: string; name: string }[];
 }) {
   const [state, action, pending] = useActionState(addMembersAction.bind(null, classId, groupNo), null);
-  if (candidates.length === 0) return null;
+  if (candidates.length === 0)
+    return (
+      <div className="mt-3 space-y-1">
+        <FormMessage state={state} />
+        <p className="text-xs text-slate-400">Không còn học sinh chưa có tổ.</p>
+      </div>
+    );
   return (
     <details className="mt-3">
       <summary className="btn-secondary btn-sm list-none">+ Thêm học sinh</summary>
@@ -41,7 +47,6 @@ export function AddMembersForm({
             <label key={c.id} className="flex items-center gap-2 text-sm">
               <input type="checkbox" name="ids" value={c.id} />
               {c.name}
-              {c.from && <span className="text-xs text-slate-500">(đang ở {c.from})</span>}
             </label>
           ))}
         </div>
