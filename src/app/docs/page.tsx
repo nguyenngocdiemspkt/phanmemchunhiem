@@ -122,11 +122,37 @@ export default function DocsHome() {
           bạn trong tổ mình.
         </p>
         <p>
+          <B>Thứ hạng các tổ được tính thế nào?</B> Mỗi tuần, tổng điểm của tổ = điểm <em>trung bình</em> các phiếu tuần đã duyệt của thành viên (không
+          cộng tổng, để tổ đông hay ít người đều công bằng) + điểm sao + điểm thầy cô/cán sự ghi trực tiếp + điểm việc tốt. Tổng cao hơn xếp trên; bảng cả
+          năm cộng điểm của từng tuần. Chi tiết xem{" "}
+          <Link href="/docs/giao-vien#thi-dua" className="text-teal-700 hover:underline">
+            Bảng thi đua tổ
+          </Link>
+          .
+        </p>
+        <p>
+          <B>Quản trị phân công giáo viên chủ nhiệm ở đâu?</B> Menu <Path>Lớp học</Path>, chọn giáo viên ở cột <B>GV chủ nhiệm</B> trên dòng của lớp rồi
+          bấm <B>Lưu</B>. Xem{" "}
+          <Link href="/docs/admin#lop-hoc" className="text-teal-700 hover:underline">
+            Phân công giáo viên chủ nhiệm
+          </Link>
+          .
+        </p>
+        <p>
+          <B>Sao không thêm được học sinh vào tổ?</B> Danh sách thêm vào tổ chỉ có các em chưa có tổ. Em đang ở tổ khác thì bấm <B>Đưa ra</B> ở tổ cũ
+          trước.
+        </p>
+        <p>
           <B>Bình chọn có lộ ai chọn gì không?</B> Học sinh chỉ thấy số phiếu của từng lựa chọn. Chỉ GVCN thấy từng em đã chọn gì.
         </p>
         <p>
           <B>Giọng nói trong vườn có bị ghi âm không?</B> Không. Âm thanh đi trực tiếp giữa các máy đang đứng gần nhau, không lưu ở đâu cả. Tin nhắn chat
           thì được lưu 3 ngày rồi tự xóa.
+        </p>
+        <p>
+          <B>Lỡ xóa nhầm học sinh hoặc lớp thì sao?</B> Dữ liệu đã xóa không khôi phục được từ giao diện; bản chụp hồ sơ được lưu trong Nhật ký thao tác để
+          đối chiếu. Học sinh nghỉ học/chuyển trường nên <em>đổi trạng thái</em> thay vì xóa. Khi xóa lớp có học sinh, hệ thống bắt gõ đúng tên lớp để
+          tránh bấm nhầm.
         </p>
         <Warn>
           Đây là dữ liệu cá nhân của học sinh. Không chia sẻ tài khoản, không chụp màn hình thông tin của các em đưa lên mạng xã hội.

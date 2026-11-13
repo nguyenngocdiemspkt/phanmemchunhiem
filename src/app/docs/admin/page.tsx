@@ -20,7 +20,7 @@ export default function AdminDocs() {
           ["thu-tu", "Thứ tự chuẩn bị đầu năm"],
           ["nam-hoc", "Năm học"],
           ["giao-vien", "Tài khoản giáo viên"],
-          ["lop-hoc", "Lớp học và phân công chủ nhiệm"],
+          ["lop-hoc", "Lớp học, phân công chủ nhiệm, xóa lớp"],
           ["xep-lop", "Xếp lớp năm học mới"],
           ["lop-chu-nhiem", "Làm việc trong một lớp"],
           ["mau-phieu", "Mẫu phiếu dùng chung"],
@@ -99,15 +99,33 @@ export default function AdminDocs() {
         </Tip>
       </Section>
 
-      <Section id="lop-hoc" title="Lớp học và phân công chủ nhiệm">
+      <Section id="lop-hoc" title="Lớp học, phân công chủ nhiệm, xóa lớp">
         <p>
           Mở <Path>Lớp học</Path> › <B>Tạo lớp mới</B>: nhập <B>Tên lớp</B> (vd 8A1), chọn <B>Năm học</B> và <B>GV chủ nhiệm</B>, bấm <B>Tạo lớp</B>. Lớp
           mới tự nhận bộ cấu hình chuẩn của vườn lớp.
         </p>
-        <p>
-          Danh sách lớp lọc được theo năm học. Trên mỗi dòng sửa trực tiếp tên lớp, năm học hoặc chọn <B>GV chủ nhiệm</B> khác rồi bấm <B>Lưu</B>. Lớp
-          chưa có người chủ nhiệm hiện <em>— Chưa phân công —</em>. Sau khi lưu có dòng &quot;Đã lưu&quot;; không lưu được thì có lời báo lý do (trùng tên lớp, năm học đã khóa...).
-        </p>
+        <Sub title="Phân công giáo viên chủ nhiệm cho lớp đã có">
+          <ol>
+            <li>
+              Mở <Path>Lớp học</Path>. Bảng bên dưới liệt kê các lớp (lọc theo năm học ở dòng <B>Năm học:</B>, hoặc chọn <B>Tất cả</B>).
+            </li>
+            <li>
+              Ở dòng của lớp, bấm vào ô trong cột <B>GV chủ nhiệm</B> (lớp chưa có người chủ nhiệm hiện <em>— Chưa phân công —</em>) và chọn giáo viên.
+            </li>
+            <li>
+              Nút <B>Lưu</B> ở cuối dòng chuyển sang màu xanh đậm; bấm <B>Lưu</B>. Dòng chữ &quot;Đã lưu. GVCN: …&quot; hiện ngay dưới ô.
+            </li>
+          </ol>
+          <p>
+            Cũng trên dòng đó sửa được <B>tên lớp</B> và <B>năm học</B> của lớp. Không lưu được thì có lời báo lý do (ví dụ trùng tên lớp trong cùng năm
+            học, năm học đã khóa). Kiểm tra lại ở <Path>Giáo viên</Path>: cột <B>Lớp chủ nhiệm</B> hiện các lớp của từng thầy cô.
+          </p>
+          <Tip>
+            Ô chọn chỉ liệt kê tài khoản giáo viên/quản trị <em>đang hoạt động</em>. Nếu chưa thấy tên thầy cô cần phân công, hãy tạo tài khoản ở{" "}
+            <Path>Giáo viên</Path> › <B>+ Thêm tài khoản giáo viên</B> trước. Một giáo viên có thể chủ nhiệm nhiều lớp. Lớp thuộc năm học đã khóa chỉ xem
+            được, muốn đổi phải <B>Mở khóa</B> năm học.
+          </Tip>
+        </Sub>
         <Sub title="Xóa lớp">
           <p>
             Bấm <B>Xóa</B> ở dòng của lớp. Lớp trống chỉ cần xác nhận. Lớp đã có học sinh hoặc đợt tự đánh giá phải <B>gõ đúng tên lớp</B> để xác nhận.

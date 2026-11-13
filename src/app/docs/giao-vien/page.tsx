@@ -146,6 +146,14 @@ export default function TeacherDocs() {
           </li>
           <li>Chỉ xóa được tổ cuối cùng, để số thứ tự và điểm thi đua của các tổ khác không bị đổi.</li>
         </ul>
+        <p>
+          Muốn xếp lại tổ cho nhiều em cùng lúc thì dùng thao tác hàng loạt <B>Phân tổ</B> ở thẻ <Path>Học sinh</Path>, hoặc bảng <B>Phân tổ nhanh</B>{" "}
+          trong cài đặt thi đua. Hai chỗ này chuyển được cả những em đang ở tổ khác.
+        </p>
+        <Warn>
+          Điểm thi đua đi theo <em>tổ hiện tại</em> của học sinh: khi chuyển một em sang tổ khác, điểm các phiếu cũ của em cũng tính cho tổ mới (kể cả
+          bảng cả năm). Nên chia tổ ổn định từ đầu học kỳ.
+        </Warn>
         <Tip>
           Tổ trưởng xem được phiếu tự chấm của các bạn trong tổ và gửi ghi nhận bổ sung; ghi nhận chỉ tính điểm khi thầy/cô chấp nhận. Xem{" "}
           <a href="/docs/to-truong">Hướng dẫn cho tổ trưởng</a>.
@@ -166,8 +174,24 @@ export default function TeacherDocs() {
             <B>Đạt từ</B>; dưới mức Đạt là &quot;Cần cố gắng&quot;. Học sinh và phụ huynh chỉ xem được điểm của chính em.
           </li>
           <li>
-            <B>Tiêu chí xếp hạng tổ (sao)</B>: các tiêu chí thầy/cô tick cho cả tổ mỗi tuần (ví dụ &quot;Trực nhật sạch&quot; +1 sao; số âm là trừ sao).{" "}
-            <B>Mỗi sao được quy ra</B> một số điểm, cộng vào tổng điểm thi đua của tổ.
+            <B>Tiêu chí xếp hạng tổ (sao)</B>: mỗi tiêu chí có số sao (số âm là trừ sao), bật/tắt được. <B>Mỗi sao được quy ra</B> một số điểm (mặc định
+            10), cộng vào tổng điểm thi đua của tổ. Có bốn loại tiêu chí:
+            <ul>
+              <li>
+                <B>Tự động: cả tổ không ai vi phạm</B>: tổ có phiếu đã duyệt trong tuần, không phiếu nào có tiêu chí trừ điểm và tổ không bị ghi điểm trừ
+                trực tiếp. <em>Mặc định đang bật, 1 sao.</em>
+              </li>
+              <li>
+                <B>Tự động: đủ phiếu cả tổ</B>: mọi thành viên đang học của tổ đều có phiếu tuần đã duyệt. Nên bật, vì điểm phiếu của tổ tính trung bình
+                (xem bên dưới).
+              </li>
+              <li>
+                <B>Tự động: cả tổ xếp loại Tốt</B>: mọi thành viên có phiếu đã duyệt và đều đạt mức Tốt.
+              </li>
+              <li>
+                <B>GVCN chấm tay</B>: ví dụ &quot;Trực nhật sạch&quot;; thầy/cô tick cho tổ đạt ở bảng thi đua của từng tuần.
+              </li>
+            </ul>
           </li>
           <li>
             <B>Phân tổ nhanh và cán sự lớp</B>: chọn tổ cho từng em trong một bảng, và tick <B>Cán sự</B>. Cán sự được ghi điểm thi đua cho các bạn (trong
@@ -278,6 +302,11 @@ export default function TeacherDocs() {
           <B>Xếp hạng cả năm</B> cộng điểm của từng tuần (mỗi tuần tính một điểm trung bình). Phiếu chưa duyệt không được tính, nên hãy duyệt đủ phiếu;
           tiêu chí sao &quot;đủ phiếu cả tổ&quot; giúp khuyến khích các em nộp đủ.
         </p>
+        <ul>
+          <li>Phiếu tính vào tuần <B>mở đợt</B>; việc tốt tính vào tuần thầy/cô <B>duyệt</B>.</li>
+          <li>Bằng điểm thì đồng hạng. Ba tổ đứng đầu có huy chương 🥇🥈🥉.</li>
+          <li>Học sinh xem được bảng xếp hạng ở mục Thi đua (tổ của em được tô màu), nhưng không xem được điểm cá nhân của bạn khác.</li>
+        </ul>
       </Section>
 
       <Section id="viec-tot" title="Việc tốt">
