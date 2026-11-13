@@ -101,6 +101,8 @@ model Classroom {
   /// Từ gardenMature: cây trưởng thành, ra trái; vượt mốc này mỗi gardenFruitStep điểm thêm 1 trái
   gardenMature      Int         @default(140)
   gardenFruitStep   Int         @default(5)
+  /// GVCN bật/tắt phòng chat của lớp trong vườn
+  chatEnabled       Boolean     @default(true)
   createdAt         DateTime    @default(now())
 
   students            Student[]
@@ -114,6 +116,7 @@ model Classroom {
   goodDeeds           GoodDeed[]
   harvests            GardenHarvest[]
   polls               Poll[]
+  chatMessages        ChatMessage[]
   transfersIn         ClassTransfer[]     @relation("TransferTo")
 
   @@unique([name, schoolYear])
@@ -163,6 +166,7 @@ model Student {
   harvests         GardenHarvest[]
   featureRequests  FeatureRequest[]
   pollVotes        PollVote[]
+  chatMessages     ChatMessage[]
   notes            Note[]
   emulationRecords EmulationRecord[]
 
@@ -579,4 +583,18 @@ model PollVote {
   updatedAt DateTime   @updatedAt
 
   @@unique([pollId, studentId])
+}
+
+/// Tin nhắn phòng chat chung của lớp trong vườn (tự xóa sau 3 ngày; GVCN xóa được tin không phù hợp)
+model ChatMessage {
+  id         String    @id @default(cuid())
+  classId    String
+  classroom  Classroom @relation(fields: [classId], references: [id], onDelete: Cascade)
+  studentId  String?
+  student    Student?  @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  authorName String
+  text       String
+  createdAt  DateTime  @default(now())
+
+  @@index([classId, createdAt])
 }

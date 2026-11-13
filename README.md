@@ -66,6 +66,20 @@ npm run dev                 # http://localhost:3000
 
 Khi thay đổi `prisma/schema.prisma`, chạy `npx prisma migrate dev --name <ten>` để tạo migration mới.
 
+## Vườn lớp realtime (online, chat, giọng nói)
+
+Vườn lớp cần thêm dịch vụ realtime (WebSocket) chạy cạnh app; không chạy được trên Vercel, cần máy chủ riêng.
+
+```
+node --env-file=.env realtime/server.mjs     # mặc định 127.0.0.1:3101
+```
+
+- nginx chuyển `wss://<tên-miền>/realtime` tới cổng 3101 (kèm header `Upgrade`/`Connection`).
+- Biến môi trường tùy chọn: `REALTIME_PORT`, `REALTIME_PUBLIC_URL` (mặc định `/realtime`),
+  `REALTIME_INTERNAL_URL` (mặc định `http://127.0.0.1:3101`), `RTC_ICE_SERVERS` (JSON, thêm máy chủ TURN nếu học sinh dùng mạng chặn kết nối trực tiếp).
+- Giọng nói đi thẳng giữa các máy (WebRTC), không qua máy chủ và không ghi âm; trình duyệt chỉ cho mở micro trên HTTPS.
+- Tin chat lưu 3 ngày rồi tự xóa; GVCN bật/tắt và xóa tin ở thẻ *Chat* của lớp.
+
 ## Bảo mật và dữ liệu
 
 - Mật khẩu được mã hóa bằng bcrypt. Phiên đăng nhập là cookie httpOnly, hết hạn sau 7 ngày.
