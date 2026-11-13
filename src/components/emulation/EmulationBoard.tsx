@@ -174,12 +174,12 @@ export function EmulationBoard({
       <div className="grid gap-6 lg:grid-cols-2">
         <RankTable
           title="Xếp hạng tuần"
-          subtitle={`Điểm phiếu tuần đã duyệt của các thành viên + điểm ghi thêm + sao (1 sao = ${data.starPoints} điểm) trong tuần đang xem`}
+          subtitle={`Điểm TRUNG BÌNH phiếu tuần đã duyệt của thành viên + việc tốt + điểm ghi thêm + sao (1 sao = ${data.starPoints} điểm) trong tuần đang xem`}
           rows={data.weekly}
           ownGroup={ownGroup}
           starPoints={data.starPoints}
         />
-        <RankTable title="Xếp hạng cả năm" subtitle="Cộng dồn tất cả các tuần" rows={data.overall} ownGroup={ownGroup} starPoints={data.starPoints} />
+        <RankTable title="Xếp hạng cả năm" subtitle="Cộng dồn điểm của tất cả các tuần (mỗi tuần một điểm trung bình phiếu)" rows={data.overall} ownGroup={ownGroup} starPoints={data.starPoints} />
       </div>
 
       {level === "teacher" && data.manualCriteria.length > 0 && (
