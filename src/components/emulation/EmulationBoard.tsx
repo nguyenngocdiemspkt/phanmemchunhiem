@@ -7,6 +7,11 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { Empty } from "@/components/ui";
 import { RecordForm } from "./RecordForm";
 
+/** Điểm có thể lẻ (trung bình): 1 chữ số thập phân, dấu phẩy kiểu Việt Nam */
+function fmtScore(n: number) {
+  return n.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
+}
+
 const MEDAL = ["🥇", "🥈", "🥉"];
 
 function Points({ value, className = "" }: { value: number; className?: string }) {
@@ -37,7 +42,7 @@ function RankTable({
           <tr>
             <th className="w-16">Hạng</th>
             <th>Tổ</th>
-            <th className="text-right" title="Tổng điểm các phiếu tuần đã duyệt của thành viên">Phiếu tuần</th>
+            <th className="text-right" title="Điểm trung bình các phiếu tuần đã duyệt của thành viên (bảng cả năm: cộng điểm trung bình của từng tuần)">Phiếu tuần (TB)</th>
             <th className="text-right" title="Điểm phiếu việc tốt đã duyệt (người làm và người được hỗ trợ)">Việc tốt</th>
             <th className="text-right" title="Điểm GV/cán sự ghi trực tiếp">Ghi thêm</th>
             <th className="text-right" title={`Sao từ tiêu chí xếp hạng tổ, 1 sao = ${starPoints} điểm`}>Sao</th>
@@ -69,7 +74,7 @@ function RankTable({
               <td className="text-right tabular-nums">
                 {r.sheetCount ? (
                   <>
-                    <span className="font-semibold">{r.sheets}</span>
+                    <span className="font-semibold">{fmtScore(r.sheets)}</span>
                     <div className="text-xs text-slate-500">{r.sheetCount} phiếu</div>
                   </>
                 ) : (
@@ -93,7 +98,7 @@ function RankTable({
                   <span className="text-slate-400">—</span>
                 )}
               </td>
-              <td className="text-right text-base font-bold tabular-nums">{r.total}</td>
+              <td className="text-right text-base font-bold tabular-nums">{fmtScore(r.total)}</td>
             </tr>
           ))}
         </tbody>

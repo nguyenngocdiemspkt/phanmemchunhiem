@@ -194,8 +194,8 @@ export default function StudentDocs() {
 
       <Section id="thi-dua" title="Thi đua tổ (và cán sự)">
         <p>
-          Mục <Path>Thi đua</Path> hiện bảng xếp hạng các tổ theo tuần và cả năm, tổ của em được đánh dấu. Điểm tổ gồm điểm phiếu tuần đã duyệt của các
-          thành viên, tiêu chí tổ thầy/cô chấm, điểm ghi trực tiếp và việc tốt.
+          Mục <Path>Thi đua</Path> hiện bảng xếp hạng các tổ theo tuần và cả năm, tổ của em được đánh dấu. Điểm tổ gồm điểm <B>trung bình</B> các phiếu tuần
+          đã duyệt của thành viên (tổ đông hay ít người đều công bằng), sao từ tiêu chí tổ, điểm ghi trực tiếp và việc tốt.
         </p>
         <p>
           Nếu em là <B>cán sự lớp</B>, trang hiện dòng &quot;Em là cán sự, được ghi điểm thi đua&quot;. Bấm <B>Ghi điểm</B>, chọn bạn (hoặc cả tổ), tiêu chí

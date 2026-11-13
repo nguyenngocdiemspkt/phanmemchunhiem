@@ -43,7 +43,9 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
   const groupRows = Array.from({ length: survey.classroom.groupCount }, (_, i) => {
     const members = students.filter((s) => s.groupNo === i + 1);
     const approved = members.map((m) => responses.find((r) => r.studentId === m.id)).filter((r) => r?.status === "APPROVED" && r.points != null);
-    return { no: i + 1, members: members.length, approved: approved.length, total: approved.reduce((sum, r) => sum + r!.points!, 0) };
+    // Trung bình điểm các phiếu đã duyệt (sĩ số các tổ khác nhau nên không cộng tổng)
+    const sum = approved.reduce((s, r) => s + r!.points!, 0);
+    return { no: i + 1, members: members.length, approved: approved.length, avg: approved.length ? Math.round((sum / approved.length) * 10) / 10 : null };
   });
 
   const questions = parseQuestions(survey.questions);
@@ -115,13 +117,13 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
         {scoring && (
           <div className="card overflow-x-auto">
             <h2 className="mb-1 font-semibold">Điểm thi đua các tổ trong đợt</h2>
-            <p className="mb-3 text-xs text-slate-500">Tổng điểm các phiếu đã duyệt của thành viên trong tổ.</p>
+            <p className="mb-3 text-xs text-slate-500">Điểm trung bình các phiếu đã duyệt của thành viên trong tổ.</p>
             <table className="table">
               <thead>
                 <tr>
                   <th>Tổ</th>
                   <th className="text-center">Phiếu đã duyệt</th>
-                  <th className="text-right">Tổng điểm</th>
+                  <th className="text-right">Điểm trung bình</th>
                 </tr>
               </thead>
               <tbody>
@@ -131,7 +133,7 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
                     <td className="text-center">
                       {g.approved}/{g.members}
                     </td>
-                    <td className="text-right font-semibold tabular-nums">{g.total}</td>
+                    <td className="text-right font-semibold tabular-nums">{g.avg == null ? "—" : g.avg.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}</td>
                   </tr>
                 ))}
               </tbody>

@@ -264,12 +264,20 @@ export default function TeacherDocs() {
         <Table
           head={["Nguồn điểm của tổ", "Ghi chú"]}
           rows={[
-            ["Phiếu tuần", "Tổng điểm các phiếu tuần đã duyệt của thành viên"],
-            ["Tiêu chí chấm tay tuần này", "Bấm vào ô để tick / bỏ tick cho tổ đạt tiêu chí (sao)"],
+            ["Phiếu tuần (TB)", "Điểm trung bình các phiếu tuần đã duyệt của thành viên (không cộng tổng, để tổ đông hay ít người đều công bằng)"],
+            ["Sao", "Số sao tổ đạt × số điểm mỗi sao. Tiêu chí chấm tay: bấm vào ô để tick / bỏ tick cho tổ trong tuần đang xem"],
             ["Điểm GV/cán sự ghi trực tiếp", <>Bấm <B>Ghi điểm</B>: chọn ghi cho một em hoặc cả tổ, tiêu chí hoặc nội dung tự nhập, số điểm ±</>],
             ["Việc tốt", "Điểm phiếu việc tốt đã duyệt (người làm và người được hỗ trợ)"],
           ]}
         />
+        <p>
+          <B>Tổng điểm tuần</B> của tổ = điểm trung bình phiếu tuần + điểm sao + điểm ghi trực tiếp + việc tốt; tổng cao hơn xếp trên, bằng điểm thì đồng
+          hạng. Ví dụ tổ có 4 phiếu đã duyệt 98, 100, 104, 106 → trung bình 102; đạt 2 sao (10 điểm/sao) → 102 + 20 = 122.
+        </p>
+        <p>
+          <B>Xếp hạng cả năm</B> cộng điểm của từng tuần (mỗi tuần tính một điểm trung bình). Phiếu chưa duyệt không được tính, nên hãy duyệt đủ phiếu;
+          tiêu chí sao &quot;đủ phiếu cả tổ&quot; giúp khuyến khích các em nộp đủ.
+        </p>
       </Section>
 
       <Section id="viec-tot" title="Việc tốt">

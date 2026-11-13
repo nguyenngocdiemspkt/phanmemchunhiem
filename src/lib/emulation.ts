@@ -59,9 +59,9 @@ export async function ensureCategories(classId: string) {
   return prisma.emulationCategory.findMany({ where: { classId }, orderBy: { sortOrder: "asc" } });
 }
 
-/** sheets: tổng điểm phiếu tuần đã duyệt của thành viên; plus/minus: điểm ghi trực tiếp */
 /**
- * sheets: tổng điểm phiếu tuần đã duyệt của thành viên; plus/minus: điểm ghi trực tiếp;
+ * sheets: điểm TRUNG BÌNH các phiếu tuần đã duyệt của thành viên (để tổ đông hay ít người đều công bằng);
+ * ở bảng cả năm là tổng các điểm trung bình từng tuần. plus/minus: điểm ghi trực tiếp;
  * stars: số sao từ tiêu chí xếp hạng tổ, quy ra starScore = stars × số điểm mỗi sao.
  */
 export type GroupStanding = {
@@ -82,7 +82,24 @@ export type GroupStanding = {
   rank: number;
 };
 
-type SheetPoints = { groupNo: number | null; points: number; date: Date };
+type SheetPoints = { groupNo: number | null; points: number; date: Date; /** số phiếu gộp trong điểm trung bình */ count?: number };
+
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+/** Gộp phiếu đã duyệt theo tổ và tuần: mỗi tổ mỗi tuần một điểm = trung bình điểm các phiếu của tuần đó */
+function weeklyAverages(sheets: SheetPoints[]): SheetPoints[] {
+  const buckets = new Map<string, { groupNo: number; week: number; sum: number; count: number }>();
+  for (const sh of sheets) {
+    if (!sh.groupNo) continue;
+    const week = weekKey(sh.date);
+    const key = `${sh.groupNo}:${week}`;
+    const b = buckets.get(key) ?? { groupNo: sh.groupNo, week, sum: 0, count: 0 };
+    b.sum += sh.points;
+    b.count++;
+    buckets.set(key, b);
+  }
+  return [...buckets.values()].map((b) => ({ groupNo: b.groupNo, points: round1(b.sum / b.count), date: new Date(b.week), count: b.count }));
+}
 
 function rankGroups(
   groupCount: number,
@@ -112,7 +129,7 @@ function rankGroups(
     const row = sh.groupNo ? rows[sh.groupNo - 1] : undefined;
     if (!row) continue;
     row.sheets += sh.points;
-    row.sheetCount++;
+    row.sheetCount += sh.count ?? 1;
     row.total += sh.points;
   }
   for (const d of deeds) {
@@ -136,7 +153,8 @@ function rankGroups(
   }
   for (const row of rows) {
     row.starScore = row.stars * stars.starPoints;
-    row.total += row.starScore;
+    row.total = round1(row.total + row.starScore);
+    row.sheets = round1(row.sheets);
   }
   // Bằng điểm thì đồng hạng
   for (const row of rows) row.rank = 1 + rows.filter((o) => o.total > row.total).length;
@@ -205,7 +223,8 @@ export async function loadEmulationBoard(
   ]);
   const weekDeeds = deeds.filter((x) => x.date >= week.start && x.date < week.end);
   const own = approved.filter((r) => r.student.classId === classId);
-  const sheets: SheetPoints[] = own.map((r) => ({ groupNo: r.student.groupNo, points: r.points!, date: r.survey.openAt }));
+  // Điểm phiếu của tổ: trung bình các phiếu đã duyệt trong từng tuần (không cộng tổng, vì sĩ số các tổ khác nhau)
+  const sheets = weeklyAverages(own.map((r) => ({ groupNo: r.student.groupNo, points: r.points!, date: r.survey.openAt })));
   const weekSheets = sheets.filter((x) => x.date >= week.start && x.date < week.end);
 
   const lastWord = (s: string) => s.trim().split(/\s+/).at(-1) ?? s;
@@ -270,7 +289,7 @@ export async function loadEmulationBoard(
   for (const r of [...allRecords, ...sheets, ...deeds, ...starEntries]) {
     if (!r.groupNo || r.groupNo > groupCount) continue;
     const bucket = chart.find((c) => r.date >= c.start && r.date < c.end);
-    if (bucket) bucket.row[`g${r.groupNo}`] = (bucket.row[`g${r.groupNo}`] as number) + r.points;
+    if (bucket) bucket.row[`g${r.groupNo}`] = round1((bucket.row[`g${r.groupNo}`] as number) + r.points);
   }
 
   const manualCriteria = groupCriteria.filter((c) => c.active && c.kind === "MANUAL");
