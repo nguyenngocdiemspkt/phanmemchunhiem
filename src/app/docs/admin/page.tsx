@@ -106,8 +106,18 @@ export default function AdminDocs() {
         </p>
         <p>
           Danh sách lớp lọc được theo năm học. Trên mỗi dòng sửa trực tiếp tên lớp, năm học hoặc chọn <B>GV chủ nhiệm</B> khác rồi bấm <B>Lưu</B>. Lớp
-          chưa có người chủ nhiệm hiện <em>— Chưa phân công —</em>. Nút <B>Xóa</B> chỉ hiện với lớp còn trống (chưa có học sinh, chưa có đợt).
+          chưa có người chủ nhiệm hiện <em>— Chưa phân công —</em>. Sau khi lưu có dòng &quot;Đã lưu&quot;; không lưu được thì có lời báo lý do (trùng tên lớp, năm học đã khóa...).
         </p>
+        <Sub title="Xóa lớp">
+          <p>
+            Bấm <B>Xóa</B> ở dòng của lớp. Lớp trống chỉ cần xác nhận. Lớp đã có học sinh hoặc đợt tự đánh giá phải <B>gõ đúng tên lớp</B> để xác nhận.
+          </p>
+          <Warn>
+            Xóa lớp sẽ xóa vĩnh viễn <em>toàn bộ học sinh đang thuộc lớp</em> (tài khoản, hồ sơ, phiếu, điểm, cây trong vườn, việc tốt) và mọi dữ liệu của
+            lớp (đợt tự đánh giá, thi đua, bình chọn, chat). Hồ sơ từng em được chụp vào Nhật ký thao tác nhưng không khôi phục được từ giao diện. Chỉ
+            dùng khi tạo lớp nhầm hoặc nhập nhầm cả lớp. Lớp thuộc năm học đã khóa không xóa được; muốn giữ dữ liệu lớp cũ thì khóa năm học thay vì xóa.
+          </Warn>
+        </Sub>
       </Section>
 
       <Section id="xep-lop" title="Xếp lớp năm học mới">

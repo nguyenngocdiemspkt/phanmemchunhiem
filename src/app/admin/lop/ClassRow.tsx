@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { SubmitButton } from "@/components/SubmitButton";
 import { deleteClassAction, updateClassAction } from "./actions";
 
 type Props = {
@@ -13,7 +12,7 @@ type Props = {
   /** GVCN hiện tại đã bị khóa tài khoản (không có trong danh sách chọn) */
   inactiveTeacher: string | null;
   studentCount: number;
-  canDelete: boolean;
+  surveyCount: number;
   years: string[];
   teachers: { id: string; fullName: string }[];
 };
@@ -30,6 +29,34 @@ export function ClassRow(p: Props) {
   const [msg, setMsg] = useState<{ ok?: string; error?: string } | null>(null);
   const [pending, start] = useTransition();
   const dirty = name !== p.name || year !== p.schoolYear || teacherId !== (p.teacherId ?? "");
+
+  /** Xóa lớp: lớp có học sinh phải gõ lại đúng tên lớp */
+  function remove() {
+    let typed = p.name;
+    if (p.studentCount > 0 || p.surveyCount > 0) {
+      const v = window.prompt(
+        `XÓA HẲN LỚP ${p.name}?
+
+` +
+          `Sẽ xóa vĩnh viễn ${p.studentCount} học sinh của lớp (tài khoản, hồ sơ, phiếu, điểm, cây trong vườn, việc tốt...) ` +
+          `và mọi dữ liệu của lớp (${p.surveyCount} đợt tự đánh giá, thi đua, bình chọn, chat). Không khôi phục được từ giao diện.
+` +
+          `Học sinh nghỉ/chuyển trường nên đổi trạng thái thay vì xóa.
+
+` +
+          `Gõ đúng tên lớp "${p.name}" để xác nhận:`,
+      );
+      if (v === null) return;
+      typed = v;
+    } else if (!window.confirm(`Xóa lớp ${p.name}? Lớp đang trống.`)) {
+      return;
+    }
+    setMsg(null);
+    start(async () => {
+      const r = await deleteClassAction(p.id, typed);
+      if (r.error) setMsg(r);
+    });
+  }
 
   function save() {
     const fd = new FormData();
@@ -74,13 +101,9 @@ export function ClassRow(p: Props) {
           <button type="button" onClick={save} disabled={pending || !dirty || !name.trim()} className={dirty ? "btn-primary btn-sm" : "btn-secondary btn-sm"}>
             {pending ? "Đang lưu..." : "Lưu"}
           </button>
-          {p.canDelete && (
-            <form action={deleteClassAction.bind(null, p.id)}>
-              <SubmitButton className="btn-danger btn-sm" pendingText="..." confirm={`Xóa lớp ${p.name}?`}>
-                Xóa
-              </SubmitButton>
-            </form>
-          )}
+          <button type="button" onClick={remove} disabled={pending} className="btn-danger btn-sm">
+            Xóa
+          </button>
         </div>
       </td>
     </tr>

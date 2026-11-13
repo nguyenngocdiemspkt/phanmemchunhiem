@@ -90,19 +90,58 @@ export async function updateClassAction(classId: string, formData: FormData): Pr
   return { ok: teacher ? `Đã lưu. GVCN: ${teacher.fullName}` : "Đã lưu." };
 }
 
-export async function deleteClassAction(classId: string) {
+/**
+ * Xóa hẳn một lớp. Lớp còn học sinh thì xóa luôn các em (tài khoản, hồ sơ, phiếu, điểm, vườn...) cùng mọi dữ liệu
+ * của lớp (đợt tự đánh giá, việc tốt, bình chọn, chat...). Phải gõ đúng tên lớp để xác nhận.
+ * Hồ sơ đầy đủ của từng học sinh được chụp vào Nhật ký thao tác trước khi xóa.
+ */
+export async function deleteClassAction(classId: string, confirmName: string): Promise<{ ok?: string; error?: string }> {
   const user = await requireUser(["ADMIN"]);
-  // Chỉ cho xóa lớp trống để tránh mất dữ liệu học sinh
   const classroom = await prisma.classroom.findUnique({
     where: { id: classId },
-    include: { _count: { select: { students: true, surveys: true, enrollments: true } } },
+    include: { year: { select: { locked: true } }, _count: { select: { students: true, surveys: true } } },
   });
-  if (!classroom || classroom._count.students > 0 || classroom._count.surveys > 0 || classroom._count.enrollments > 0) return;
-  await prisma.classroom.delete({ where: { id: classId } });
+  if (!classroom) return { error: "Không tìm thấy lớp." };
+  if (classroom.year.locked) return { error: `Năm học ${classroom.schoolYear} đã khóa. Mở khóa năm học trước khi xóa lớp.` };
+  if (confirmName.trim() !== classroom.name) return { error: "Tên lớp gõ lại không khớp, chưa xóa." };
+
+  // Học sinh đang thuộc lớp này (học sinh đã lên lớp khác ở năm sau thì giữ nguyên)
+  const full = await prisma.user.findMany({
+    where: { role: "STUDENT", student: { classId } },
+    include: {
+      student: {
+        include: {
+          responses: { include: { feedback: true, survey: { select: { title: true } } } },
+          notes: true,
+          transfers: true,
+          enrollments: true,
+        },
+      },
+    },
+  });
+  const names = full.map((u) => `${u.fullName} (${u.username})`);
+  await prisma.$transaction([
+    prisma.auditLog.createMany({
+      data: full.map(({ passwordHash: _omit, ...u }) => ({
+        actorId: user.id,
+        actorName: user.fullName,
+        action: "student.delete",
+        entity: "Student",
+        entityId: u.student!.id,
+        classId,
+        summary: `Xóa vĩnh viễn học sinh ${u.fullName} (${u.username}) khi xóa lớp ${classroom.name}, ${u.student!.responses.length} phiếu`,
+        detail: JSON.parse(JSON.stringify(u)),
+      })),
+    }),
+    prisma.user.deleteMany({ where: { id: { in: full.map((u) => u.id) }, role: "STUDENT" } }),
+    prisma.classroom.delete({ where: { id: classId } }),
+  ]);
   await audit(user, "class.delete", {
     entity: "Classroom",
     entityId: classId,
-    summary: `Xóa lớp ${classroom.name} (${classroom.schoolYear})`,
+    summary: `Xóa lớp ${classroom.name} (${classroom.schoolYear})${full.length ? `, kèm ${full.length} học sinh` : ""}${classroom._count.surveys ? ` và ${classroom._count.surveys} đợt tự đánh giá` : ""}`,
+    detail: { students: names },
   });
-  revalidatePath("/admin/lop");
+  revalidatePath("/", "layout");
+  return { ok: `Đã xóa lớp ${classroom.name}${full.length ? ` và ${full.length} học sinh` : ""}.` };
 }

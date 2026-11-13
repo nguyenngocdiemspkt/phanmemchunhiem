@@ -97,7 +97,7 @@ export default async function ClassesPage({ searchParams }: { searchParams: Prom
                     teacherId={c.homeroomTeacherId}
                     inactiveTeacher={c.homeroomTeacher && !c.homeroomTeacher.active ? c.homeroomTeacher.fullName : null}
                     studentCount={c._count.students}
-                    canDelete={c._count.students === 0 && c._count.surveys === 0 && c._count.enrollments === 0}
+                    surveyCount={c._count.surveys}
                     years={openYears}
                     teachers={teachers}
                   />
