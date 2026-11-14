@@ -25,7 +25,7 @@ export default function AdminDocs() {
           ["lop-chu-nhiem", "Làm việc trong một lớp"],
           ["mau-phieu", "Mẫu phiếu dùng chung"],
           ["cau-hinh-vuon", "Cấu hình chuẩn vườn lớp"],
-          ["de-xuat", "Đề xuất chức năng của học sinh"],
+          ["de-xuat", "Đề xuất phần mềm của học sinh"],
           ["nhat-ky", "Nhật ký thao tác"],
           ["an-toan", "Lưu ý an toàn dữ liệu"],
         ]}
@@ -194,9 +194,9 @@ export default function AdminDocs() {
         </p>
       </Section>
 
-      <Section id="de-xuat" title="Đề xuất chức năng của học sinh">
+      <Section id="de-xuat" title="Đề xuất phần mềm của học sinh">
         <p>
-          Học sinh gửi ý tưởng chức năng mới cho phần mềm. Mở <Path>Đề xuất</Path> để xem danh sách, đổi <B>Trạng thái</B> (Chờ xem xét, Đã đưa vào kế hoạch, Đã làm, Chưa thực
+          Học sinh gửi ý tưởng chức năng mới cho phần mềm. Mở <Path>Đề xuất phần mềm</Path> để xem danh sách, đổi <B>Trạng thái</B> (Chờ xem xét, Đã đưa vào kế hoạch, Đã làm, Chưa thực
           hiện) và viết <B>Phản hồi cho học sinh</B>; em gửi đề xuất sẽ thấy phản hồi này.
         </p>
       </Section>

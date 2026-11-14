@@ -13,7 +13,7 @@ export function ClassTabs({ classId }: { classId: string }) {
     { href: `${base}/dot`, label: "Đợt tự đánh giá" },
     { href: `${base}/thi-dua`, label: "Thi đua tổ" },
     { href: `${base}/viec-tot`, label: "Việc tốt" },
-    { href: `${base}/binh-chon`, label: "Bình chọn" },
+    { href: `${base}/binh-chon`, label: "Bình chọn tuyên dương" },
     { href: `${base}/vuon`, label: "Vườn lớp" },
     { href: `${base}/chat`, label: "Chat" },
   ];

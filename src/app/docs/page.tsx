@@ -12,7 +12,7 @@ export default function DocsHome() {
         title="Class Master – Quản lý lớp chủ nhiệm"
         intro={
           <p>
-            Class Master giúp giáo viên chủ nhiệm theo dõi lớp: học sinh tự đánh giá mỗi tuần, thi đua giữa các tổ, ghi nhận việc tốt, bình chọn và vườn
+            Class Master giúp giáo viên chủ nhiệm theo dõi lớp: học sinh tự đánh giá mỗi tuần, thi đua giữa các tổ, ghi nhận việc tốt, bình chọn tuyên dương và vườn
             lớp, nơi mỗi em chăm một cây lớn lên theo điểm rèn luyện của mình. Hãy chọn đúng vai trò của bạn để xem hướng dẫn.
           </p>
         }
@@ -44,7 +44,7 @@ export default function DocsHome() {
             được mọi việc của giáo viên ở tất cả các lớp.
           </li>
           <li>
-            <B>Giáo viên chủ nhiệm (GVCN)</B>: quản lý lớp mình chủ nhiệm: học sinh, tổ, phiếu tự đánh giá, thi đua, việc tốt, bình chọn, vườn lớp, phòng
+            <B>Giáo viên chủ nhiệm (GVCN)</B>: quản lý lớp mình chủ nhiệm: học sinh, tổ, phiếu tự đánh giá, thi đua, việc tốt, bình chọn tuyên dương, vườn lớp, phòng
             chat. Giáo viên chỉ thấy lớp mình chủ nhiệm.
           </li>
           <li>
@@ -52,7 +52,7 @@ export default function DocsHome() {
             <em>trong tổ mình</em> và ghi nhận thêm (nhận xét, vi phạm) để GVCN xác nhận.
           </li>
           <li>
-            <B>Học sinh</B>: làm phiếu tự đánh giá hằng tuần, xem nhận xét của thầy cô, chăm cây trong vườn lớp, tạo phiếu việc tốt, bình chọn, đề xuất chức
+            <B>Học sinh</B>: làm phiếu tự đánh giá hằng tuần, xem nhận xét của thầy cô, chăm cây trong vườn lớp, tạo phiếu việc tốt, bình chọn tuyên dương, đề xuất chức
             năng mới.
           </li>
         </ul>
@@ -143,7 +143,7 @@ export default function DocsHome() {
           trước.
         </p>
         <p>
-          <B>Bình chọn có lộ ai chọn gì không?</B> Học sinh chỉ thấy số phiếu của từng lựa chọn. Chỉ GVCN thấy từng em đã chọn gì.
+          <B>Bình chọn có lộ ai chọn gì không?</B> Không. Ở bình chọn tuyên dương, học sinh chỉ thấy bạn được tuyên dương và lời khen ẩn danh; ở bình chọn khác chỉ thấy số phiếu từng lựa chọn. Chỉ GVCN thấy từng em đã chọn gì.
         </p>
         <p>
           <B>Giọng nói trong vườn có bị ghi âm không?</B> Không. Âm thanh đi trực tiếp giữa các máy đang đứng gần nhau, không lưu ở đâu cả. Tin nhắn chat

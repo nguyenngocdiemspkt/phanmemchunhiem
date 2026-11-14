@@ -117,6 +117,7 @@ model Classroom {
   harvests            GardenHarvest[]
   polls               Poll[]
   chatMessages        ChatMessage[]
+  commendationVotes   CommendationVote[]
   transfersIn         ClassTransfer[]     @relation("TransferTo")
 
   @@unique([name, schoolYear])
@@ -156,19 +157,21 @@ model Student {
   /// Ghi chú của giáo viên (học sinh không thấy)
   note            String?
 
-  transfers        ClassTransfer[]
-  enrollments      Enrollment[]
-  responses        Response[]
-  scoreReports     ScoreReport[]     @relation("ReportTarget")
-  reportsMade      ScoreReport[]     @relation("ReportAuthor")
-  deedsDone        GoodDeed[]        @relation("DeedAuthor")
-  deedsReceived    GoodDeed[]        @relation("DeedBeneficiary")
-  harvests         GardenHarvest[]
-  featureRequests  FeatureRequest[]
-  pollVotes        PollVote[]
-  chatMessages     ChatMessage[]
-  notes            Note[]
-  emulationRecords EmulationRecord[]
+  transfers             ClassTransfer[]
+  enrollments           Enrollment[]
+  responses             Response[]
+  scoreReports          ScoreReport[]      @relation("ReportTarget")
+  reportsMade           ScoreReport[]      @relation("ReportAuthor")
+  deedsDone             GoodDeed[]         @relation("DeedAuthor")
+  deedsReceived         GoodDeed[]         @relation("DeedBeneficiary")
+  harvests              GardenHarvest[]
+  featureRequests       FeatureRequest[]
+  pollVotes             PollVote[]
+  chatMessages          ChatMessage[]
+  commendationsGiven    CommendationVote[] @relation("CommendationVoter")
+  commendationsReceived CommendationVote[] @relation("CommendationNominee")
+  notes                 Note[]
+  emulationRecords      EmulationRecord[]
 
   @@index([classId])
 }
@@ -597,4 +600,25 @@ model ChatMessage {
   createdAt  DateTime  @default(now())
 
   @@index([classId, createdAt])
+}
+
+/// Bình chọn tuyên dương hằng tuần: mỗi học sinh bầu 1 bạn cùng lớp (không tự bầu), đổi được trong tuần.
+/// Tuyên dương tháng/học kỳ được tính từ số lần được tuyên dương tuần.
+model CommendationVote {
+  id        String    @id @default(cuid())
+  classId   String
+  classroom Classroom @relation(fields: [classId], references: [id], onDelete: Cascade)
+  /// 0h thứ Hai (giờ VN) của tuần bình chọn
+  weekStart DateTime
+  voterId   String
+  voter     Student   @relation("CommendationVoter", fields: [voterId], references: [id], onDelete: Cascade)
+  nomineeId String
+  nominee   Student   @relation("CommendationNominee", fields: [nomineeId], references: [id], onDelete: Cascade)
+  /// Lý do ngắn (vì sao bạn xứng đáng được tuyên dương)
+  reason    String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([voterId, weekStart])
+  @@index([classId, weekStart])
 }

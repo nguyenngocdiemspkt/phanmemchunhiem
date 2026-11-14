@@ -21,7 +21,7 @@ export default async function AdminFeatureRequestsPage({ searchParams }: { searc
 
   return (
     <>
-      <PageHeader title="Đề xuất chức năng của học sinh" subtitle={`${total} đề xuất · ${count("NEW")} chờ xem xét`} />
+      <PageHeader title="Đề xuất phần mềm của học sinh" subtitle={`${total} đề xuất · ${count("NEW")} chờ xem xét`} />
       <div className="mb-4 flex flex-wrap gap-2 text-sm">
         <Link href="/admin/de-xuat" className={`rounded-lg px-3 py-1 ${!status ? "bg-teal-50 font-medium text-teal-800" : "text-slate-600 hover:bg-slate-100"}`}>
           Tất cả ({total})

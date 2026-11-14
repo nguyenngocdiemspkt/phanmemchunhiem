@@ -18,7 +18,7 @@ const NAV: Record<Role, { href: string; label: string }[]> = {
     { href: "/admin/xep-lop", label: "Xếp lớp" },
     { href: "/admin/cau-hinh-vuon", label: "Cấu hình vườn" },
     { href: "/gv/mau-phieu", label: "Mẫu phiếu" },
-    { href: "/admin/de-xuat", label: "Đề xuất" },
+    { href: "/admin/de-xuat", label: "Đề xuất phần mềm" },
     { href: "/admin/nhat-ky", label: "Nhật ký" },
   ],
   TEACHER: [
@@ -30,10 +30,10 @@ const NAV: Record<Role, { href: string; label: string }[]> = {
     { href: "/hs/hanh-trinh", label: "Hành trình" },
     { href: "/hs/vuon", label: "Vườn lớp" },
     { href: "/hs/viec-tot", label: "Việc tốt" },
-    { href: "/hs/binh-chon", label: "Bình chọn" },
+    { href: "/hs/binh-chon", label: "Bình chọn tuyên dương" },
     { href: "/hs/thi-dua", label: "Thi đua" },
     { href: "/hs/ca-nhan", label: "Cá nhân" },
-    { href: "/hs/de-xuat", label: "Đề xuất" },
+    { href: "/hs/de-xuat", label: "Đề xuất phần mềm" },
   ],
 };
 

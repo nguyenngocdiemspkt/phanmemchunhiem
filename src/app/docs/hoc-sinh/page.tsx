@@ -11,7 +11,7 @@ export default function StudentDocs() {
         intro={
           <p>
             Mỗi tuần em tự đánh giá bản thân, xem nhận xét của thầy cô, chăm cây của mình trong vườn lớp, làm việc tốt và cùng tổ thi đua. Các mục chính nằm
-            trên thanh menu: Trang chính, Hành trình, Vườn lớp, Việc tốt, Bình chọn, Thi đua, Cá nhân, Đề xuất.
+            trên thanh menu: Trang chính, Hành trình, Vườn lớp, Việc tốt, Bình chọn tuyên dương, Thi đua, Cá nhân, Đề xuất phần mềm.
           </p>
         }
       />
@@ -24,10 +24,10 @@ export default function StudentDocs() {
           ["vuon", "Vườn lớp"],
           ["chat-giong-noi", "Chat và nói chuyện trong vườn"],
           ["viec-tot", "Việc tốt"],
-          ["binh-chon", "Bình chọn"],
+          ["binh-chon", "Bình chọn tuyên dương"],
           ["thi-dua", "Thi đua tổ (và cán sự)"],
           ["ca-nhan", "Thông tin cá nhân, tài khoản"],
-          ["de-xuat", "Đề xuất chức năng mới"],
+          ["de-xuat", "Đề xuất phần mềm"],
           ["quy-tac", "Quy tắc khi dùng"],
         ]}
       />
@@ -184,12 +184,37 @@ export default function StudentDocs() {
         </p>
       </Section>
 
-      <Section id="binh-chon" title="Bình chọn">
-        <p>
-          Mục <Path>Bình chọn</Path> hiện các bình chọn đang mở. Chọn một lựa chọn rồi bấm <B>Bình chọn</B>. Bình chọn xong em mới thấy kết quả (số phiếu
+      <Section id="binh-chon" title="Bình chọn tuyên dương">
+        <Sub title="Bầu tuyên dương mỗi tuần">
+          <ol>
+            <li>
+              Mở <Path>Bình chọn tuyên dương</Path>. Ở khung <B>Tuyên dương tuần này</B>, chọn <B>một bạn</B> em thấy xứng đáng (em không tự bầu cho
+              mình được).
+            </li>
+            <li>Ghi ngắn gọn lý do (không bắt buộc), ví dụ &quot;Bạn giảng bài Toán cho cả tổ&quot;.</li>
+            <li>
+              Bấm <B>Bầu tuyên dương</B>. Em đổi được phiếu (<B>Đổi phiếu</B>) đến hết Chủ nhật.
+            </li>
+          </ol>
+          <p>
+            Hết tuần, bạn <B>nhiều phiếu nhất</B> được tuyên dương tuần (bằng phiếu thì cùng được tuyên dương). Lời khen của các bạn hiện dưới tên bạn
+            được tuyên dương nhưng <em>không ghi tên người viết</em>. Các bạn không biết em bầu cho ai; chỉ thầy/cô chủ nhiệm xem được.
+          </p>
+        </Sub>
+        <Sub title="Bảng vàng: tuyên dương tháng và học kỳ">
+          <p>
+            Hệ thống tự tính: bạn được <B>tuyên dương tuần nhiều lần nhất</B> trong tháng được tuyên dương tháng; trong học kỳ được tuyên dương học kỳ.
+            Bằng số lần thì xét tổng số phiếu của các tuần đó. Khi tháng/học kỳ chưa kết thúc, bảng ghi <B>Tạm tính</B>; hết tháng/học kỳ thì ghi{" "}
+            <B>Đã chốt</B>. Tuần thuộc tháng của ngày thứ Hai đầu tuần.
+          </p>
+        </Sub>
+        <Sub title="Bình chọn khác của lớp">
+          <p>
+            Phía dưới là các bình chọn khác thầy/cô tạo (ví dụ chọn nơi đi dã ngoại). Chọn một lựa chọn rồi bấm <B>Bình chọn</B>. Bình chọn xong em mới thấy kết quả (số phiếu
           từng lựa chọn). Khi còn mở, em có thể <B>Đổi lựa chọn</B>.
         </p>
-        <p>Các bạn không biết em chọn gì; chỉ thầy/cô chủ nhiệm thấy.</p>
+          <p>Các bạn không biết em chọn gì; chỉ thầy/cô chủ nhiệm thấy.</p>
+        </Sub>
       </Section>
 
       <Section id="thi-dua" title="Thi đua tổ (và cán sự)">
@@ -213,9 +238,9 @@ export default function StudentDocs() {
         </p>
       </Section>
 
-      <Section id="de-xuat" title="Đề xuất chức năng mới">
+      <Section id="de-xuat" title="Đề xuất phần mềm">
         <p>
-          Em có ý tưởng làm phần mềm hay hơn? Mục <Path>Đề xuất</Path>: nhập <B>Tên chức năng</B>, <B>Em mong muốn chức năng hoạt động thế nào?</B> và{" "}
+          Em có ý tưởng làm phần mềm hay hơn? Mục <Path>Đề xuất phần mềm</Path>: nhập <B>Tên chức năng</B>, <B>Em mong muốn chức năng hoạt động thế nào?</B> và{" "}
           <B>Mô tả thêm</B> (chức năng giúp được gì cho em và các bạn), bấm <B>Gửi đề xuất</B>. Em theo dõi trạng thái và phản hồi của nhà trường trong danh
           sách <B>Đề xuất em đã gửi</B>.
         </p>

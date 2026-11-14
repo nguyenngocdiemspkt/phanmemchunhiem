@@ -11,7 +11,7 @@ export default function TeacherDocs() {
         intro={
           <p>
             Sau khi đăng nhập, mục <Path>Lớp chủ nhiệm</Path> hiện các lớp thầy/cô chủ nhiệm. Bấm vào một lớp để mở các thẻ: Tổng quan, Học sinh, Tổ, Đợt tự
-            đánh giá, Thi đua tổ, Việc tốt, Bình chọn, Vườn lớp, Chat.
+            đánh giá, Thi đua tổ, Việc tốt, Bình chọn tuyên dương, Vườn lớp, Chat.
           </p>
         }
       />
@@ -27,7 +27,7 @@ export default function TeacherDocs() {
           ["phu-huynh", "Báo cho phụ huynh"],
           ["thi-dua", "Bảng thi đua tổ"],
           ["viec-tot", "Việc tốt"],
-          ["binh-chon", "Bình chọn"],
+          ["binh-chon", "Bình chọn tuyên dương"],
           ["vuon", "Vườn lớp"],
           ["chat", "Phòng chat của lớp"],
           ["tong-quan", "Tổng quan lớp"],
@@ -320,10 +320,31 @@ export default function TeacherDocs() {
         </p>
       </Section>
 
-      <Section id="binh-chon" title="Bình chọn">
+      <Section id="binh-chon" title="Bình chọn tuyên dương">
+        <Sub title="Tuyên dương tuần, tháng, học kỳ (tự động)">
+          <ul>
+            <li>
+              Mỗi tuần (thứ Hai đến Chủ nhật), mỗi học sinh bầu <B>1 bạn</B> trong lớp kèm lý do ngắn; không tự bầu được, đổi phiếu được đến hết Chủ nhật.
+              Thầy/cô không cần mở đợt, tuần nào hệ thống cũng tự mở.
+            </li>
+            <li>
+              Hết tuần, bạn <B>nhiều phiếu nhất</B> được <B>tuyên dương tuần</B> (bằng phiếu thì cùng được tuyên dương).
+            </li>
+            <li>
+              <B>Tuyên dương tháng / học kỳ</B> được tính tự động: bạn được tuyên dương tuần nhiều lần nhất; bằng nhau thì xét tổng số phiếu. Chưa hết
+              kỳ thì ghi &quot;Tạm tính&quot;, hết kỳ thì &quot;Đã chốt&quot;. Tuần thuộc tháng của ngày thứ Hai; học kỳ theo mốc của năm học.
+            </li>
+          </ul>
+          <p>
+            Thẻ <Path>Bình chọn tuyên dương</Path> có <B>bảng vàng</B> và <B>chi tiết từng tuần</B>: số em đã bầu, danh sách em chưa bầu, ai bầu ai và
+            lý do (chỉ thầy/cô thấy). Chọn tuần ở dãy ngày phía trên bảng. Phiếu có lý do không phù hợp thì bấm <B>Xóa</B> (ghi vào Nhật ký). Học sinh
+            chỉ thấy kết quả và lời khen ẩn danh, không biết bạn khác bầu cho ai.
+          </p>
+        </Sub>
+        <Sub title="Bình chọn khác">
         <ol>
           <li>
-            Thẻ <Path>Bình chọn</Path> › <B>Tạo bình chọn mới</B>: nhập <B>Nội dung bình chọn</B>, các lựa chọn (bấm <B>+ Thêm lựa chọn</B> để thêm),{" "}
+            Phần <B>Bình chọn khác</B> › <B>Tạo bình chọn mới</B>: nhập <B>Nội dung bình chọn</B>, các lựa chọn (bấm <B>+ Thêm lựa chọn</B> để thêm),{" "}
             <B>Bắt đầu</B> và <B>Kết thúc</B>. Bấm <B>Tạo bình chọn</B>.
           </li>
           <li>Học sinh bình chọn trong khoảng thời gian đó, đổi được lựa chọn khi bình chọn còn mở.</li>
@@ -332,6 +353,7 @@ export default function TeacherDocs() {
           </li>
         </ol>
         <p>Học sinh chỉ thấy số phiếu và phần trăm của từng lựa chọn, sau khi đã bình chọn.</p>
+        </Sub>
       </Section>
 
       <Section id="vuon" title="Vườn lớp">

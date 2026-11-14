@@ -10,7 +10,7 @@ export default async function StudentFeatureRequestsPage() {
   const mine = await prisma.featureRequest.findMany({ where: { studentId: student.id }, orderBy: { createdAt: "desc" } });
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <PageHeader title="Đề xuất chức năng mới" subtitle="Em muốn Class Master có thêm chức năng gì? Hãy gửi ý tưởng cho nhà trường nhé." />
+      <PageHeader title="Đề xuất phần mềm" subtitle="Em muốn Class Master có thêm chức năng gì? Hãy gửi ý tưởng cho nhà trường nhé." />
       <div className="card">
         <CreateFeatureRequestForm />
       </div>
