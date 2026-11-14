@@ -88,6 +88,8 @@ model Classroom {
   ratingPass        Int         @default(85)
   /// Mỗi sao của tiêu chí xếp hạng tổ được quy ra bao nhiêu điểm
   starPoints        Int         @default(10)
+  /// Điểm cộng (thi đua tổ + vườn) cho bạn được bình chọn tuyên dương tuần; 0 = không cộng
+  commendPoints     Int         @default(3)
   /// Khu vườn lớp: chu kỳ thu hoạch và mốc điểm nuôi cây của từng giai đoạn
   gardenCycle       GardenCycle @default(SEMESTER)
   /// Điểm vườn khởi đầu của mỗi học sinh (cây là hạt giống)

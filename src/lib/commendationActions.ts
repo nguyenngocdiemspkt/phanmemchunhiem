@@ -59,3 +59,22 @@ export async function deleteCommendationVoteAction(classId: string, voteId: stri
   });
   revalidate(classId);
 }
+
+/** GVCN đặt số điểm cộng cho bạn được tuyên dương tuần (0 = không cộng) */
+export async function setCommendPointsAction(classId: string, _prev: CommendState, formData: FormData): Promise<CommendState> {
+  const { user, classroom } = await requireClassAccess(classId);
+  const locked = await classLockedMessage(classroom);
+  if (locked) return { error: locked };
+  const n = Number(formData.get("commendPoints"));
+  if (!Number.isInteger(n) || n < 0 || n > 50) return { error: "Điểm cộng là số nguyên từ 0 đến 50." };
+  await prisma.classroom.update({ where: { id: classId }, data: { commendPoints: n } });
+  await audit(user, "class.commend.points", {
+    classId,
+    entity: "Classroom",
+    entityId: classId,
+    summary: `Lớp ${classroom.name}: điểm cộng khi được tuyên dương tuần ${classroom.commendPoints} → ${n}`,
+  });
+  revalidatePath(`/gv/lop/${classId}`, "layout");
+  revalidatePath("/hs", "layout");
+  return { ok: n ? `Đã lưu: bạn được tuyên dương tuần được cộng ${n} điểm vào thi đua tổ và vườn cây.` : "Đã lưu: không cộng điểm khi được tuyên dương." };
+}

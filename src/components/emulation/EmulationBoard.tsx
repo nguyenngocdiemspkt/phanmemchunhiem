@@ -43,7 +43,7 @@ function RankTable({
             <th className="w-16">Hạng</th>
             <th>Tổ</th>
             <th className="text-right" title="Điểm trung bình các phiếu tuần đã duyệt của thành viên (bảng cả năm: cộng điểm trung bình của từng tuần)">Phiếu tuần (TB)</th>
-            <th className="text-right" title="Điểm phiếu việc tốt đã duyệt (người làm và người được hỗ trợ)">Việc tốt</th>
+            <th className="text-right" title="Điểm phiếu việc tốt đã duyệt (người làm và người được hỗ trợ) và điểm được bình chọn tuyên dương tuần">Việc tốt, tuyên dương</th>
             <th className="text-right" title="Điểm GV/cán sự ghi trực tiếp">Ghi thêm</th>
             <th className="text-right" title={`Sao từ tiêu chí xếp hạng tổ, 1 sao = ${starPoints} điểm`}>Sao</th>
             <th className="text-right">Tổng</th>
@@ -174,7 +174,7 @@ export function EmulationBoard({
       <div className="grid gap-6 lg:grid-cols-2">
         <RankTable
           title="Xếp hạng tuần"
-          subtitle={`Điểm TRUNG BÌNH phiếu tuần đã duyệt của thành viên + việc tốt + điểm ghi thêm + sao (1 sao = ${data.starPoints} điểm) trong tuần đang xem`}
+          subtitle={`Điểm TRUNG BÌNH phiếu tuần đã duyệt của thành viên + việc tốt, tuyên dương + điểm ghi thêm + sao (1 sao = ${data.starPoints} điểm) trong tuần đang xem`}
           rows={data.weekly}
           ownGroup={ownGroup}
           starPoints={data.starPoints}

@@ -27,6 +27,10 @@ export type PeriodResult = {
   label: string;
   /** Kỳ đã kết thúc: kết quả chốt; chưa thì là tạm tính */
   done: boolean;
+  /** Thứ Hai đầu tiên tính vào kỳ */
+  startsAt: Date;
+  /** Thời điểm kỳ kết thúc (kết quả được chốt) */
+  endsAt: Date;
   weeksCounted: number;
   standings: Standing[];
   winners: Standing[];
@@ -45,6 +49,13 @@ function localYm(d: Date) {
 function lastMondayOfMonth(y: number, m: number) {
   const firstNext = new Date(Date.UTC(y, m + 1, 1) - VN_OFFSET); // 0h ngày 1 tháng sau (giờ VN)
   return weekStart(addDays(firstNext, -1));
+}
+
+/** Thứ Hai đầu tiên (0h giờ VN) có ngày thuộc tháng y/m */
+function firstMondayOfMonth(y: number, m: number) {
+  const first = new Date(Date.UTC(y, m, 1) - VN_OFFSET);
+  const ws = weekStart(first);
+  return ws.getTime() === first.getTime() ? ws : addDays(ws, 7);
 }
 
 function aggregate(weeks: WeekResult[]): { standings: Standing[]; winners: Standing[] } {
@@ -116,6 +127,8 @@ export async function loadCommendations(
         key: `${y}-${String(m + 1).padStart(2, "0")}`,
         label: `Tháng ${m + 1}/${y}`,
         done: current > lastMondayOfMonth(y, m).getTime(),
+        startsAt: firstMondayOfMonth(y, m),
+        endsAt: addDays(lastMondayOfMonth(y, m), 7),
         weeksCounted: inMonth.length,
         ...aggregate(inMonth),
       };
@@ -133,7 +146,7 @@ export async function loadCommendations(
     ] as const) {
       if (now.getTime() < from) continue;
       const inSem = doneWeeks.filter((w) => w.start.getTime() >= from && w.start.getTime() < to);
-      semesters.push({ key, label, done: now.getTime() >= to, weeksCounted: inSem.length, ...aggregate(inSem) });
+      semesters.push({ key, label, done: now.getTime() >= to, startsAt: new Date(from), endsAt: new Date(to), weeksCounted: inSem.length, ...aggregate(inSem) });
     }
   }
 
@@ -141,3 +154,31 @@ export async function loadCommendations(
 }
 
 export type CommendationData = Awaited<ReturnType<typeof loadCommendations>>;
+
+/**
+ * Các bạn được tuyên dương tuần (tuần đã kết thúc) của nhiều lớp, trong khoảng thời gian (theo thứ Hai đầu tuần).
+ * Dùng để cộng điểm thi đua tổ / điểm vườn và gửi thông báo chúc mừng.
+ */
+export async function commendWinners(classIds: string[], range: { start?: Date; end?: Date } = {}, now = new Date()) {
+  if (classIds.length === 0) return [];
+  const current = weekStart(now);
+  const end = range.end && range.end < current ? range.end : current;
+  const votes = await prisma.commendationVote.findMany({
+    where: { classId: { in: classIds }, weekStart: { ...(range.start ? { gte: range.start } : {}), lt: end } },
+    select: { classId: true, weekStart: true, nomineeId: true },
+  });
+  const tally = new Map<string, Map<string, number>>();
+  for (const v of votes) {
+    const k = `${v.classId}|${v.weekStart.getTime()}`;
+    const t = tally.get(k) ?? new Map<string, number>();
+    t.set(v.nomineeId, (t.get(v.nomineeId) ?? 0) + 1);
+    tally.set(k, t);
+  }
+  const out: { classId: string; weekStart: Date; studentId: string; votes: number }[] = [];
+  for (const [k, t] of tally) {
+    const [classId, w] = k.split("|");
+    const max = Math.max(...t.values());
+    for (const [studentId, n] of t) if (n === max) out.push({ classId, weekStart: new Date(Number(w)), studentId, votes: n });
+  }
+  return out;
+}

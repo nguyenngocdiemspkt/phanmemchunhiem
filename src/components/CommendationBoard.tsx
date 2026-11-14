@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { CommendationData, PeriodResult, WeekResult } from "@/lib/commendation";
 import { Badge } from "./ui";
 
@@ -17,7 +18,19 @@ function Names({ list, meId, suffix }: { list: { studentId: string; name: string
   );
 }
 
-function PeriodRow({ p, meId }: { p: PeriodResult; meId?: string | null }) {
+/** Link giấy khen: GV in cho tất cả bạn được tuyên dương của kỳ; học sinh chỉ thấy giấy khen của mình */
+function CertLink({ p, cert, meId }: { p: PeriodResult; cert?: { classId: string; prefix: string; teacher: boolean }; meId?: string | null }) {
+  if (!cert || !p.done || !p.winners.length) return null;
+  if (!cert.teacher && !p.winners.some((w) => w.studentId === meId)) return null;
+  const href = `/giay-khen/${cert.classId}?ky=${cert.prefix}-${p.key}${cert.teacher ? "" : `&hs=${meId}`}`;
+  return (
+    <Link href={href} target="_blank" className="ml-2 text-xs font-medium text-teal-700 underline">
+      🖨 Giấy khen
+    </Link>
+  );
+}
+
+function PeriodRow({ p, meId, cert }: { p: PeriodResult; meId?: string | null; cert?: { classId: string; prefix: string; teacher: boolean } }) {
   return (
     <li className="flex flex-wrap items-baseline justify-between gap-2 py-2">
       <span className="text-sm">
@@ -36,6 +49,7 @@ function PeriodRow({ p, meId }: { p: PeriodResult; meId?: string | null }) {
         ) : (
           <span className="text-slate-400">Chưa có</span>
         )}
+        <CertLink p={p} cert={cert} meId={meId} />
       </span>
     </li>
   );
@@ -61,7 +75,20 @@ function WeekRow({ w, meId }: { w: WeekResult; meId?: string | null }) {
 /**
  * Bảng vàng tuyên dương: tuần (đã chốt), tháng và học kỳ (tính từ số lần được tuyên dương tuần).
  */
-export function CommendationBoard({ data, meId, weeksShown = 4 }: { data: CommendationData; meId?: string | null; weeksShown?: number }) {
+export function CommendationBoard({
+  data,
+  meId,
+  weeksShown = 4,
+  classId,
+  teacher = false,
+}: {
+  data: CommendationData;
+  meId?: string | null;
+  weeksShown?: number;
+  /** Có classId thì hiện link giấy khen cho tháng/học kỳ đã chốt */
+  classId?: string;
+  teacher?: boolean;
+}) {
   const doneWeeks = data.weeks.filter((w) => w.done).slice(0, weeksShown);
   return (
     <div className="grid gap-4 md:grid-cols-3" data-testid="commend-board">
@@ -83,7 +110,7 @@ export function CommendationBoard({ data, meId, weeksShown = 4 }: { data: Commen
         <p className="text-xs text-slate-500">Bạn được tuyên dương tuần nhiều lần nhất trong tháng; bằng nhau thì xét tổng số phiếu.</p>
         <ul className="mt-2 divide-y divide-slate-100">
           {data.months.slice(0, 3).map((m) => (
-            <PeriodRow key={m.key} p={m} meId={meId} />
+            <PeriodRow key={m.key} p={m} meId={meId} cert={classId ? { classId, prefix: "thang", teacher } : undefined} />
           ))}
         </ul>
       </div>
@@ -93,7 +120,7 @@ export function CommendationBoard({ data, meId, weeksShown = 4 }: { data: Commen
         {data.semesters.length ? (
           <ul className="mt-2 divide-y divide-slate-100">
             {data.semesters.map((s) => (
-              <PeriodRow key={s.key} p={s} meId={meId} />
+              <PeriodRow key={s.key} p={s} meId={meId} cert={classId ? { classId, prefix: "hocky", teacher } : undefined} />
             ))}
           </ul>
         ) : (

@@ -6,6 +6,7 @@ import { POLL_STATUS, pollStatus } from "@/lib/polls";
 import { Badge, Empty } from "@/components/ui";
 import { CreatePollForm } from "@/components/PollForms";
 import { CommendationBoard } from "@/components/CommendationBoard";
+import { CommendPointsForm, CopyText } from "@/components/CommendationForms";
 import { SubmitButton } from "@/components/SubmitButton";
 import { loadCommendations, weekLabel } from "@/lib/commendation";
 import { deleteCommendationVoteAction } from "@/lib/commendationActions";
@@ -52,6 +53,39 @@ export default async function ClassPollsPage({ params, searchParams }: { params:
   const notVoted = activeStudents.filter((s) => !voted.has(s.id));
   const pastWeeks = [commend.currentWeek, ...commend.weeks.filter((w) => w.done).map((w) => w.start)].slice(0, 10);
 
+  // Tin nhắn soạn sẵn: tuần vừa chốt (kèm lời khen), tháng, học kỳ
+  const lastWeek = commend.weeks.find((w) => w.done && w.winners.length);
+  const lastPraises = lastWeek
+    ? await prisma.commendationVote.findMany({
+        where: { classId: id, weekStart: lastWeek.start, nomineeId: { in: lastWeek.winners.map((w) => w.studentId) }, reason: { not: null } },
+        select: { reason: true },
+        take: 6,
+      })
+    : [];
+  const pts = classroom.commendPoints;
+  const messages: { title: string; text: string }[] = [];
+  if (lastWeek) {
+    messages.push({
+      title: `Tuyên dương tuần ${lastWeek.label}`,
+      text: [
+        `🎉 Lớp ${classroom.name} tuyên dương tuần ${lastWeek.label}: ${lastWeek.winners.map((w) => `${w.name} (${w.votes}/${lastWeek.voters} phiếu bầu của các bạn)`).join(", ")}.`,
+        ...(pts ? [`Mỗi bạn được cộng ${pts} điểm thi đua.`] : []),
+        ...(lastPraises.length ? ["Lời khen của các bạn:", ...lastPraises.map((p) => `– “${p.reason}”`)] : []),
+        "Chúc mừng các em và mong cả lớp tiếp tục cố gắng!",
+      ].join("\n"),
+    });
+  }
+  for (const p of [commend.months[0], commend.semesters[0]]) {
+    if (!p || !p.winners.length) continue;
+    messages.push({
+      title: `Tuyên dương ${p.label.charAt(0).toLowerCase()}${p.label.slice(1)}${p.done ? "" : " (tạm tính)"}`,
+      text: [
+        `🏆 Lớp ${classroom.name} tuyên dương ${p.label.charAt(0).toLowerCase()}${p.label.slice(1)}${p.done ? "" : " (tạm tính)"}: ${p.winners.map((w) => `${w.name} (${w.wins} lần được tuyên dương tuần, ${w.votes} phiếu)`).join(", ")}.`,
+        p.done ? "Chúc mừng các em!" : "Kết quả sẽ được chốt khi hết kỳ.",
+      ].join("\n"),
+    });
+  }
+
   return (
     <div className="space-y-6">
       <div className="space-y-4" data-testid="commend-teacher">
@@ -62,7 +96,20 @@ export default async function ClassPollsPage({ params, searchParams }: { params:
             từ số lần được tuyên dương tuần (bằng nhau thì xét tổng số phiếu). Học sinh không biết bạn khác bầu cho ai; chỉ thầy/cô thấy chi tiết.
           </p>
         </div>
-        <CommendationBoard data={commend} weeksShown={6} />
+        <CommendationBoard data={commend} weeksShown={6} classId={id} teacher />
+        <div className="card space-y-4">
+          <CommendPointsForm classId={id} value={classroom.commendPoints} />
+          {messages.length > 0 && (
+            <div className="space-y-4 border-t border-slate-100 pt-4">
+              <p className="text-sm text-slate-600">
+                Tin nhắn soạn sẵn: bấm <b>Sao chép</b> để dán vào nhóm Zalo phụ huynh/lớp hoặc đọc trong giờ sinh hoạt.
+              </p>
+              {messages.map((m) => (
+                <CopyText key={m.title} title={m.title} text={m.text} />
+              ))}
+            </div>
+          )}
+        </div>
         <div className="card">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-semibold">

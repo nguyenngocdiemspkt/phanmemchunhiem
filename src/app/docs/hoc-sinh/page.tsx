@@ -234,6 +234,11 @@ export default function StudentDocs() {
             Bằng số lần thì xét tổng số phiếu của các tuần đó. Khi tháng/học kỳ chưa kết thúc, bảng ghi <B>Tạm tính</B>; hết tháng/học kỳ thì ghi{" "}
             <B>Đã chốt</B>. Tuần thuộc tháng của ngày thứ Hai đầu tuần.
           </p>
+          <p>
+            Được tuyên dương tuần, em được <B>cộng điểm</B> vào thi đua của tổ và điểm vườn cây (thầy/cô đặt số điểm). Nếu đã bật nhắc nhở, em nhận
+            thông báo chúc mừng. Được tuyên dương tháng hoặc học kỳ, em có <B>giấy khen</B>: bấm <B>🖨 Giấy khen</B> cạnh tên em ở bảng vàng để xem và
+            in.
+          </p>
         </Sub>
         <Sub title="Bình chọn khác của lớp">
           <p>

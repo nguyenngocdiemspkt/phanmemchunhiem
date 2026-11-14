@@ -350,6 +350,28 @@ export default function TeacherDocs() {
             chỉ thấy kết quả và lời khen ẩn danh, không biết bạn khác bầu cho ai.
           </p>
         </Sub>
+        <Sub title="Sau khi có kết quả tuyên dương">
+          <ul>
+            <li>
+              <B>Cộng điểm:</B> bạn được tuyên dương tuần được cộng điểm (mặc định <B>3</B>) vào <B>thi đua tổ</B> (cột &quot;Việc tốt, tuyên
+              dương&quot;, tính vào tuần được tuyên dương) và <B>điểm vườn cây</B>. Đổi số điểm ở ô <B>Điểm cộng cho bạn được tuyên dương tuần</B> rồi
+              bấm <B>Lưu</B>; nhập 0 là không cộng. Số điểm mới áp dụng cho cả các tuần trước.
+            </li>
+            <li>
+              <B>Thông báo chúc mừng:</B> bạn được tuyên dương (tuần, tháng, học kỳ) nhận thông báo đẩy chúc mừng nếu đã bật nhắc nhở (không gửi từ 22h
+              đến 6h).
+            </li>
+            <li>
+              <B>Tin nhắn soạn sẵn:</B> bên dưới ô điểm cộng có nội dung tuyên dương tuần vừa chốt (kèm lời khen của các bạn), tháng và học kỳ. Bấm{" "}
+              <B>📋 Sao chép</B> để dán vào nhóm Zalo phụ huynh/lớp hoặc đọc trong giờ sinh hoạt.
+            </li>
+            <li>
+              <B>Giấy khen:</B> ở bảng vàng, tháng/học kỳ đã chốt có link <B>🖨 Giấy khen</B>. Trang giấy khen có tất cả các bạn được tuyên dương của kỳ,
+              mỗi bạn một trang A4 ngang; bấm <B>In / Lưu PDF</B> để in hoặc lưu thành tệp PDF. Học sinh được tuyên dương cũng xem và in được giấy khen của
+              mình.
+            </li>
+          </ul>
+        </Sub>
         <Sub title="Bình chọn khác">
         <ol>
           <li>

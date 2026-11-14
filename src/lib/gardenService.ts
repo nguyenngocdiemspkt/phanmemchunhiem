@@ -3,6 +3,7 @@ import { prisma } from "./db";
 import { addDays } from "./format";
 import { gardenLayout, parseCharacter, plantState, plotPos, type GardenThresholds } from "./garden";
 import { byVietnameseName } from "./students";
+import { commendWinners, weekLabel } from "./commendation";
 
 type YearDates = { name: string; startDate: Date; semester2Start: Date; endDate: Date };
 export type GardenCycleInfo = { key: string; label: string; start: Date; end: Date };
@@ -28,7 +29,7 @@ function cycleFromKey(key: string, years: Map<string, YearDates>): GardenCycleIn
 export type GardenBreakdown = {
   /** Σ(điểm phiếu tuần đã duyệt − điểm gốc) */
   sheets: number;
-  /** Tổng điểm việc tốt đã duyệt (làm việc tốt + được hỗ trợ) */
+  /** Tổng điểm việc tốt đã duyệt (làm việc tốt + được hỗ trợ) và điểm được bình chọn tuyên dương tuần */
   deeds: number;
   /** Các việc tốt đã duyệt trong chu kỳ, mới nhất trước */
   deedList: { title: string; points: number; helped: boolean }[];
@@ -64,6 +65,23 @@ export async function gardenBreakdown(studentIds: string[], range: { start: Date
   for (const s of sheets) {
     const r = result.get(s.studentId);
     if (r) r.sheets += s.points! - s.survey.baseScore!;
+  }
+  // Được bình chọn tuyên dương tuần: cộng điểm theo cài đặt của lớp (0 = không cộng)
+  const classes = await prisma.classroom.findMany({
+    where: { students: { some: { id: { in: studentIds } } } },
+    select: { id: true, commendPoints: true },
+  });
+  const commendPts = new Map(classes.map((c) => [c.id, c.commendPoints]));
+  const winners = await commendWinners(
+    classes.filter((c) => c.commendPoints !== 0).map((c) => c.id),
+    range,
+  );
+  for (const w of winners.sort((a, b) => b.weekStart.getTime() - a.weekStart.getTime())) {
+    const r = result.get(w.studentId);
+    const pts = commendPts.get(w.classId) ?? 0;
+    if (!r || !pts) continue;
+    r.deeds += pts;
+    r.deedList.push({ title: `Được cả lớp bình chọn tuyên dương tuần ${weekLabel(w.weekStart)}`, points: pts, helped: false });
   }
   for (const d of deeds) {
     const author = result.get(d.authorId);

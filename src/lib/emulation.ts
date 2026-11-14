@@ -4,6 +4,7 @@ import { requireUser } from "./auth";
 import { addDays, fmtShortDate, toDateInput, weekStart } from "./format";
 import { effectiveCounts, groupName, parseCounts, parseCriteria } from "./scoring";
 import { computeGroupStars, ensureGroupCriteria, weekKey, type StarHit } from "./groupRanking";
+import { commendWinners } from "./commendation";
 
 export const MAX_GROUPS = 12;
 
@@ -165,7 +166,7 @@ const CHART_WEEKS = 8;
 
 /** Toàn bộ dữ liệu cho bảng thi đua của một lớp trong một tuần. */
 export async function loadEmulationBoard(
-  classroom: { id: string; groupCount: number; groupNames: unknown; ratingGood: number; starPoints: number },
+  classroom: { id: string; groupCount: number; groupNames: unknown; ratingGood: number; starPoints: number; commendPoints: number },
   week: { start: Date; end: Date },
 ) {
   const { id: classId, groupCount, groupNames } = classroom;
@@ -221,6 +222,13 @@ export async function loadEmulationBoard(
     ...(d.author.classId === classId && d.authorPoints ? [{ groupNo: d.author.groupNo, points: d.authorPoints, date: d.reviewedAt! }] : []),
     ...(d.beneficiary?.classId === classId && d.beneficiaryPoints ? [{ groupNo: d.beneficiary.groupNo, points: d.beneficiaryPoints, date: d.reviewedAt! }] : []),
   ]);
+  // Được bình chọn tuyên dương tuần: cộng điểm cho tổ hiện tại của bạn đó, vào tuần được tuyên dương
+  if (classroom.commendPoints) {
+    const groupOf = new Map(students.map((s) => [s.id, s.groupNo]));
+    for (const w of await commendWinners([classId])) {
+      if (groupOf.has(w.studentId)) deeds.push({ groupNo: groupOf.get(w.studentId) ?? null, points: classroom.commendPoints, date: w.weekStart });
+    }
+  }
   const weekDeeds = deeds.filter((x) => x.date >= week.start && x.date < week.end);
   const own = approved.filter((r) => r.student.classId === classId);
   // Điểm phiếu của tổ: trung bình các phiếu đã duyệt trong từng tuần (không cộng tổng, vì sĩ số các tổ khác nhau)

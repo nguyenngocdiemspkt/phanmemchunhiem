@@ -90,7 +90,7 @@ export default async function StudentPollsPage() {
           )}
         </div>
       )}
-      <CommendationBoard data={commend} meId={student.id} />
+      <CommendationBoard data={commend} meId={student.id} classId={student.classId} />
 
       <h2 className="pt-2 text-lg font-semibold">Bình chọn khác của lớp</h2>
       {polls.length === 0 && <Empty>Lớp chưa có bình chọn nào khác.</Empty>}
