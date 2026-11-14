@@ -146,6 +146,14 @@ export default function DocsHome() {
           <B>Bình chọn có lộ ai chọn gì không?</B> Không. Ở bình chọn tuyên dương, học sinh chỉ thấy bạn được tuyên dương và lời khen ẩn danh; ở bình chọn khác chỉ thấy số phiếu từng lựa chọn. Chỉ GVCN thấy từng em đã chọn gì.
         </p>
         <p>
+          <B>Làm sao để không quên làm phiếu?</B> Học sinh bật <B>Nhắc nhở</B> ở Trang chính; máy sẽ hiện thông báo 24 giờ và 3 giờ trước hạn nếu
+          em chưa làm phiếu. Xem{" "}
+          <Link href="/docs/hoc-sinh#nhac-nho" className="text-teal-700 hover:underline">
+            Bật nhắc nhở làm phiếu
+          </Link>
+          .
+        </p>
+        <p>
           <B>Giọng nói trong vườn có bị ghi âm không?</B> Không. Âm thanh đi trực tiếp giữa các máy đang đứng gần nhau, không lưu ở đâu cả. Tin nhắn chat
           thì được lưu 3 ngày rồi tự xóa.
         </p>

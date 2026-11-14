@@ -4,6 +4,8 @@ import { AppShell } from "@/components/AppShell";
 import { Avatar } from "@/components/Avatar";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { PageHeader } from "@/components/ui";
+import { PushToggle } from "@/components/PushToggle";
+import { pushPublicKey } from "@/lib/push";
 
 const ROLE_LABEL = { ADMIN: "Quản trị", TEACHER: "Giáo viên", STUDENT: "Học sinh" } as const;
 
@@ -29,6 +31,11 @@ export default async function AccountPage() {
           <p className="mb-3 text-sm text-slate-500">Ảnh được tự cắt vuông và thu nhỏ trước khi lưu. Thầy cô và các bạn trong lớp nhìn thấy ảnh này.</p>
           <AvatarUploader hasAvatar={!!user.avatarUpdatedAt} />
         </div>
+        {user.role === "STUDENT" && (
+          <div className="mb-6">
+            <PushToggle publicKey={pushPublicKey()} />
+          </div>
+        )}
         <div className="card">
           <h2 className="mb-1 font-semibold">Mật khẩu</h2>
           <p className="mb-3 text-sm text-slate-500">

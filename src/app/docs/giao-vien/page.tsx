@@ -24,6 +24,7 @@ export default function TeacherDocs() {
           ["thi-dua-cai-dat", "Cài đặt thi đua và điểm cá nhân"],
           ["mau-phieu", "Mẫu phiếu tự đánh giá"],
           ["dot", "Đợt tự đánh giá: tạo, nhận xét, duyệt"],
+          ["nhac-nho", "Nhắc học sinh làm phiếu"],
           ["phu-huynh", "Báo cho phụ huynh"],
           ["thi-dua", "Bảng thi đua tổ"],
           ["viec-tot", "Việc tốt"],
@@ -263,6 +264,14 @@ export default function TeacherDocs() {
           </p>
         </Sub>
         <Tip>Điểm thi đua cá nhân, điểm tổ và cây trong vườn lớp chỉ tính các phiếu đã duyệt.</Tip>
+      </Section>
+
+      <Section id="nhac-nho" title="Nhắc học sinh làm phiếu">
+        <p>
+          Học sinh tự bật <B>nhắc nhở</B> trên điện thoại/máy tính của mình (Trang chính › <B>Bật nhắc nhở</B>). Khi một đợt sắp hết hạn, hệ thống tự
+          gửi thông báo cho các em <B>chưa nộp phiếu</B> hoặc có phiếu đang được thầy/cô <B>nhờ sửa</B>, ở mốc <B>24 giờ</B> và <B>3 giờ</B> trước hạn
+          (mỗi mốc một lần, không gửi từ 22h đến 6h). Thầy/cô không cần làm gì thêm; nên nhắc các em bật nhắc nhở ngay buổi đầu dùng phần mềm.
+        </p>
       </Section>
 
       <Section id="phu-huynh" title="Báo cho phụ huynh">

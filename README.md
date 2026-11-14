@@ -80,6 +80,12 @@ node --env-file=.env realtime/server.mjs     # mặc định 127.0.0.1:3101
 - Giọng nói đi thẳng giữa các máy (WebRTC), không qua máy chủ và không ghi âm; trình duyệt chỉ cho mở micro trên HTTPS.
 - Tin chat lưu 3 ngày rồi tự xóa; GVCN bật/tắt và xóa tin ở thẻ *Chat* của lớp.
 
+## Nhắc làm phiếu bằng thông báo đẩy (Web Push)
+
+- Tạo khóa một lần: `npx web-push generate-vapid-keys`, rồi thêm vào `.env`: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (địa chỉ trang, vd `https://ten-mien`).
+- Máy chủ Next.js tự kiểm tra mỗi 5 phút (`src/instrumentation-node.ts`) và nhắc học sinh chưa nộp phiếu ở mốc 24 giờ và 3 giờ trước hạn (không nhắc 22h–6h). Tắt bằng `REMINDERS_DISABLED=1`.
+- Cần HTTPS. Học sinh bật nhắc nhở ở Trang chính; iPhone cần "Thêm vào MH chính" (iOS 16.4+).
+
 ## Bảo mật và dữ liệu
 
 - Mật khẩu được mã hóa bằng bcrypt. Phiên đăng nhập là cookie httpOnly, hết hạn sau 7 ngày.

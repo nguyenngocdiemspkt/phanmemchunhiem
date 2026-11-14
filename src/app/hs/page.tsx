@@ -5,6 +5,8 @@ import { requireStudent } from "@/lib/auth";
 import { fmtDateTime, surveyStatus } from "@/lib/format";
 import { Badge, StatusBadge } from "@/components/ui";
 import { FeedbackCard, goalsOf } from "@/components/FeedbackCard";
+import { PushToggle } from "@/components/PushToggle";
+import { pushPublicKey } from "@/lib/push";
 
 export default async function StudentHome({ searchParams }: { searchParams: Promise<{ "da-nop"?: string }> }) {
   const { user, student } = await requireStudent();
@@ -40,6 +42,8 @@ export default async function StudentHome({ searchParams }: { searchParams: Prom
         <h1 className="text-2xl font-bold text-slate-900">Chào {user.fullName.split(" ").at(-1)}! 👋</h1>
         <p className="text-sm text-slate-500">Lớp {student.classroom.name}</p>
       </div>
+
+      <PushToggle publicKey={pushPublicKey()} compact />
 
       {justSubmitted && (
         <p className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">

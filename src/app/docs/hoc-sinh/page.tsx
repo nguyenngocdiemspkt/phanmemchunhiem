@@ -19,6 +19,7 @@ export default function StudentDocs() {
         items={[
           ["dang-nhap", "Đăng nhập lần đầu"],
           ["phieu", "Làm phiếu tự đánh giá hằng tuần"],
+          ["nhac-nho", "Bật nhắc nhở làm phiếu"],
           ["ket-qua", "Xem nhận xét và kết quả"],
           ["hanh-trinh", "Hành trình tiến bộ"],
           ["vuon", "Vườn lớp"],
@@ -64,6 +65,32 @@ export default function StudentDocs() {
           <B>Gửi phiếu</B> lại.
         </p>
         <Warn>Khai đúng sự thật. Tổ trưởng có thể bổ sung nếu em khai thiếu, và thầy/cô là người chốt điểm cuối cùng.</Warn>
+      </Section>
+
+      <Section id="nhac-nho" title="Bật nhắc nhở làm phiếu">
+        <p>
+          Để không quên làm phiếu, em bật thông báo trên điện thoại hoặc máy tính của mình. Khi sắp hết hạn mà em <B>chưa làm phiếu</B> (hoặc phiếu
+          đang được thầy/cô nhờ sửa), máy sẽ hiện thông báo <B>24 giờ</B> và <B>3 giờ</B> trước hạn, kể cả khi em không mở Class Master. Hệ thống
+          không nhắc từ 22h đến 6h. Bấm vào thông báo là mở đúng phiếu.
+        </p>
+        <ol>
+          <li>
+            Ở <Path>Trang chính</Path> (hoặc <Path>Tài khoản của tôi</Path>), ô <B>🔔 Nhắc làm phiếu tự đánh giá</B>, bấm <B>Bật nhắc nhở</B>.
+          </li>
+          <li>
+            Trình duyệt hỏi quyền gửi thông báo: bấm <B>Cho phép</B>.
+          </li>
+          <li>
+            Bấm <B>Gửi thử</B> để kiểm tra: máy hiện thông báo là đã bật thành công.
+          </li>
+        </ol>
+        <p>
+          Mỗi điện thoại/máy tính bật riêng. Muốn thôi nhận thông báo trên thiết bị nào thì bấm <B>Tắt</B> trên thiết bị đó.
+        </p>
+        <Tip>
+          <B>iPhone/iPad</B> (iOS 16.4 trở lên): mở trang bằng Safari, bấm nút Chia sẻ › <B>Thêm vào MH chính</B>, rồi mở Class Master từ biểu tượng
+          trên màn hình chính và bật nhắc nhở ở đó. Nếu lỡ bấm <B>Chặn</B>, hãy cho phép lại Thông báo trong cài đặt trang của trình duyệt.
+        </Tip>
       </Section>
 
       <Section id="ket-qua" title="Xem nhận xét và kết quả">

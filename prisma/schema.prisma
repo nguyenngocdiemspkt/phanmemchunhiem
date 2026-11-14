@@ -41,15 +41,16 @@ model User {
   avatarUpdatedAt    DateTime?
   avatar             UserAvatar?
 
-  student          Student?
-  homeroomClasses  Classroom[]       @relation("Homeroom")
-  templates        FormTemplate[]
-  feedbacks        Feedback[]
-  notes            Note[]
-  emulationRecords EmulationRecord[]
-  auditLogs        AuditLog[]
-  classTransfers   ClassTransfer[]
-  reportDecisions  ScoreReport[]
+  student           Student?
+  homeroomClasses   Classroom[]        @relation("Homeroom")
+  templates         FormTemplate[]
+  feedbacks         Feedback[]
+  notes             Note[]
+  emulationRecords  EmulationRecord[]
+  auditLogs         AuditLog[]
+  pushSubscriptions PushSubscription[]
+  classTransfers    ClassTransfer[]
+  reportDecisions   ScoreReport[]
 }
 
 /// Năm học. Tuần học được đánh số từ startDate (tuần 1 là tuần chứa startDate).
@@ -621,4 +622,31 @@ model CommendationVote {
 
   @@unique([voterId, weekStart])
   @@index([classId, weekStart])
+}
+
+/// Đăng ký nhận thông báo đẩy (Web Push) của một trình duyệt/thiết bị
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+/// Đã nhắc học sinh làm phiếu ở mốc nào (mỗi mốc chỉ nhắc một lần): kind = "24h" | "3h"
+model ReminderLog {
+  id        String   @id @default(cuid())
+  surveyId  String
+  studentId String
+  kind      String
+  sentAt    DateTime @default(now())
+  /// Số thiết bị đã gửi thành công
+  delivered Int      @default(0)
+
+  @@unique([surveyId, studentId, kind])
 }
